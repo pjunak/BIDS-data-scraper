@@ -1,0 +1,40 @@
+query ListAdverts(
+  $offerType: [OfferType]
+  $estateType: [EstateType]
+  $regionOsmIds: [ID]
+  $limit: Int
+  $offset: Int
+) {
+  listAdverts(
+    offerType: $offerType
+    estateType: $estateType
+    regionOsmIds: $regionOsmIds
+    limit: $limit
+    offset: $offset
+    order: TIMEORDER_DESC
+  ) {
+    totalCount
+    list {
+      id
+      uri
+      offerType
+      estateType
+      disposition
+      surface
+      surfaceLand
+      price
+      charges
+      currency
+      originalPrice
+      condition
+      ownership
+      penb
+      isNew
+      etage
+      reserved
+      address(locale: CS)
+      imageAltText(locale: CS)
+      gps { lat lng }
+    }
+  }
+}

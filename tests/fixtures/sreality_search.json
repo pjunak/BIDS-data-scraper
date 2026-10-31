@@ -1,0 +1,111 @@
+{
+ "pagination": {
+  "limit": 100,
+  "offset": 0,
+  "total": 1
+ },
+ "results": [
+  {
+   "advert_images": [
+    "//d18-a.sdn.cz/d_18/c_img_qG_C/nCR9NVflLBaEbFWJZIFz4p1/0fe8.jpeg"
+   ],
+   "advert_images_all": [
+    {
+     "advert_image_sdn_url": "//d18-a.sdn.cz/d_18/c_img_qG_C/nCR9NVflLBaEbFWJZIFz4p1/0fe8.jpeg",
+     "restb_room_type": 28,
+     "room_type_confidence": 0.9694144129753113
+    }
+   ],
+   "advert_name": "Prodej bytu 2+kk 81 m²",
+   "category_main_cb": {
+    "name": "Byty",
+    "value": 1
+   },
+   "category_sub_cb": {
+    "name": "2+kk",
+    "value": 4
+   },
+   "category_type_cb": {
+    "name": "Prodej",
+    "value": 1
+   },
+   "discount_show": false,
+   "has_matterport_url": false,
+   "has_video": true,
+   "hash_id": 567742540,
+   "locality": {
+    "city": "Brno",
+    "city_seo_name": "brno",
+    "citypart": "Komárov",
+    "citypart_seo_name": "komarov",
+    "country": "Česká republika",
+    "country_id": 112,
+    "country_seo_name": "ceska-republika",
+    "district": "Brno-město",
+    "district_id": 72,
+    "district_seo_name": "brno-mesto",
+    "entity_type": "street",
+    "geohash": "u2ezf0vz81",
+    "gps_lat": 49.1802214815,
+    "gps_lon": 16.6192313044,
+    "housenumber": null,
+    "inaccuracy_type": "street",
+    "municipality": null,
+    "municipality_id": 5740,
+    "municipality_seo_name": null,
+    "quarter": "Brno-jih",
+    "quarter_id": 17,
+    "quarter_seo_name": "brno-jih",
+    "region": "Jihomoravský kraj",
+    "region_id": 14,
+    "region_seo_name": "jihomoravsky-kraj",
+    "street": "Komárovská",
+    "street_id": 79431,
+    "street_seo_name": "komarovska",
+    "streetnumber": null,
+    "ward": null,
+    "ward_id": 14648,
+    "ward_seo_name": null
+   },
+   "poi_atm_distance": 606,
+   "poi_bus_public_transport_distance": 154,
+   "poi_kindergarten_distance": 417,
+   "poi_medic_distance": 573,
+   "poi_metro_distance": 100000,
+   "poi_playground_distance": 355,
+   "poi_post_office_distance": 177,
+   "poi_restaurant_distance": 113,
+   "poi_school_distance": 511,
+   "poi_shop_distance": 904,
+   "poi_small_shop_distance": 228,
+   "poi_train_distance": 403,
+   "poi_vet_distance": 51,
+   "premise": {
+    "city_seo_name": "brno",
+    "seo_name": "ukazkova-realitni-kancelar"
+   },
+   "premise_id": 100000,
+   "premise_logo": "",
+   "price": 13715000.0,
+   "price_currency_cb": {
+    "name": "Kč",
+    "value": 1
+   },
+   "price_czk": 13715000.0,
+   "price_czk_m2": 169321,
+   "price_summary": 13715000.0,
+   "price_summary_czk": 13715000.0,
+   "price_summary_unit_cb": {
+    "name": "za nemovitost",
+    "value": 1
+   },
+   "price_unit_cb": {
+    "name": "za nemovitost",
+    "value": 1
+   },
+   "user_id": 100000
+  }
+ ],
+ "status_code": 200,
+ "status_message": "OK"
+}

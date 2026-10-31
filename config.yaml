@@ -1,0 +1,129 @@
+# BIDS collector – konfigurace
+db_path: /data/collector.sqlite
+files_dir: /data/files
+exports_dir: /data/exports   # noční snapshoty databáze ke stažení přes web
+exports_keep: 7
+
+# Slušné stahování: identifikace + pauza mezi požadavky (s náhodným rozptylem).
+user_agent: "Mozilla/5.0 (compatible; BIDS-skolni-projekt-MENDELU; +https://github.com/pjunak/BIDS-data-scraper)"
+request_delay_s: 1.5
+
+schedule:
+  listings_at: "03:15"   # inzeráty jednou denně (čas Europe/Prague)
+  run_on_start: false    # true = po startu kontejneru hned jedno stažení
+
+# ---------------------------------------------------------------------------
+# PRIMÁRNÍ DATA – inzeráty (každý den, snímek všech aktivních inzerátů)
+# ---------------------------------------------------------------------------
+listings:
+  sreality:
+    enabled: true
+    region_id: 14                  # Jihomoravský kraj
+    per_page: 100
+    categories:
+      - {main: 1, type: 1}         # byty – prodej
+      - {main: 1, type: 2}         # byty – pronájem
+      - {main: 2, type: 1}         # domy – prodej
+      - {main: 2, type: 2}         # domy – pronájem
+    fetch_details_for_new: true    # detail (stav, vlastnictví, PENB…) jen pro nově viděné inzeráty
+    max_details_per_run: 3000
+
+  bezrealitky:
+    enabled: true
+    region_osm_ids: ["R442311"]    # OSM relace Jihomoravského kraje
+    offer_types: [PRODEJ, PRONAJEM]
+    estate_types: [BYT, DUM]
+    page_size: 100
+
+  idnes:
+    enabled: true
+    max_pages: 300
+    searches:
+      - {url: "https://reality.idnes.cz/s/prodej/byty/jihomoravsky-kraj/",   offer: prodej,   estate: byt}
+      - {url: "https://reality.idnes.cz/s/pronajem/byty/jihomoravsky-kraj/", offer: pronajem, estate: byt}
+      - {url: "https://reality.idnes.cz/s/prodej/domy/jihomoravsky-kraj/",   offer: prodej,   estate: dum}
+      - {url: "https://reality.idnes.cz/s/pronajem/domy/jihomoravsky-kraj/", offer: pronajem, estate: dum}
+
+# ---------------------------------------------------------------------------
+# SEKUNDÁRNÍ DATA – soubory ke stažení (s historií, duplicity se neukládají)
+# ---------------------------------------------------------------------------
+downloads:
+  # MF – Cenová mapa nájemného: stáhne aktuální i všechny historické XLSX (od 2019).
+  - name: mf_cenova_mapa_najemneho
+    type: discover
+    page_url: https://mf.gov.cz/cs/rozpoctova-politika/podpora-projektoveho-rizeni/cenova-mapa/cenova-mapa-infografika
+    link_regex: '/assets/attachments/[^"''\s]*Cenova-mapa[^"''\s]*\.xlsx'
+    every_days: 7
+
+  # IDS JMK – jízdní řády GTFS (zdroj data.brno.cz / ArcGIS). Mění se často, verze se archivují.
+  - name: gtfs_ids_jmk
+    type: direct
+    url: https://www.arcgis.com/sharing/rest/content/items/379d2e9a7907460c8ca7fda1f3e84328/data
+    filename: gtfs_ids_jmk.zip
+    every_days: 7
+
+  # Soubory pokrývají celou ČR; filtr na Jihomoravský kraj až v ETL (kódy u každé položky).
+
+  # ČSÚ – počet obyvatel všech obcí po letech (datová sada OBY02A, ~200 MB, ročně).
+  # Kód obce ve sloupci UZ01234596C (Brno 582786), celkem = POHL2 0.
+  - name: csu_pocet_obyvatel_obce
+    type: direct
+    url: https://data.csu.gov.cz/opendata/sady/OBY02A/distribuce/csv
+    filename: csu_OBY02A_obyvatele_obce.csv
+    every_days: 30
+
+  # ČSÚ – průměrná hrubá měsíční mzda v krajích (MZDR). Kraj ve sloupci Uz0123vm.KRAJ (CZ064).
+  - name: csu_mzdy_kraje
+    type: direct
+    url: https://data.csu.gov.cz/opendata/sady/MZDR/distribuce/csv
+    filename: csu_MZDR_mzdy_kraje.csv
+    every_days: 30
+
+  # ČSÚ – průměr a medián mezd v krajích (sada 110080, JMK = uzemi_kod 3115). Název souboru
+  # se mění s každým vydáním, odkaz se hledá v katalogovém záznamu (JSON-LD).
+  - name: csu_median_mezd_kraje
+    type: discover
+    page_url: https://vdb.czso.cz/pll/eweb/lkod_ld.datova_sada?nazev=Prumerna_hruba_mesicni_mzda_a_median_mezd_v_krajich
+    link_regex: '"soubor_ke_sta\S+?":\s*"([^"]+\.csv[^"]*)"'
+    every_days: 30
+
+  # ČSÚ – průměrné kupní ceny bytů a rodinných domů v Kč/m² podle krajů, okresů a velikosti obce
+  # (CEN0402; roky a tříletá období). Realizované ceny pro srovnání s nabídkovými.
+  - name: csu_ceny_nemovitosti
+    type: direct
+    url: https://data.csu.gov.cz/opendata/sady/CEN0402/distribuce/csv
+    filename: csu_CEN0402_ceny_nemovitosti.csv
+    every_days: 30
+
+  # MPSV – nezaměstnanost v obcích po měsících od 2025 (jeden soubor ~40 MB, ';', desetinná čárka).
+  # Kód obce obec_kod, kraj_kod 116 = JMK, pno = podíl nezaměstnaných (zlomek).
+  - name: mpsv_nezamestnanost_obce
+    type: direct
+    url: https://data.mpsv.cz/portal/api/reports/by-table/evid_pno_adresa_agr_frz_odata/data/csv?fileName=pno&unbounded=true
+    filename: mpsv_nezamestnanost_obce.csv
+    every_days: 30
+
+  # MPSV – nezaměstnanost v obcích 2014-03 až 2024-12 (už se neaktualizuje), měsíční JSON.
+  # Bez kraje: JMK = okresy Okres/3701 až 3707. (Varianty .json.gz server posílá s Content-Encoding
+  # gzip, takže by se uložily rozbalené pod jménem .gz.)
+  - name: mpsv_nezamestnanost_obce_historie
+    type: discover
+    page_url: https://data.mpsv.cz/od/soubory/nezamestnanost-v-obcich/
+    link_regex: 'href="(nezamestnanost-v-obcich-\d{2}-\d{4}\.json)"'
+    every_days: 90
+
+  # Policie ČR – mapa kriminality, měsíční ZIP s CSV od 2023 (x, y = střed anonymizační oblasti v obci).
+  # Měsíce se na webu průběžně přepočítávají, proto se poslední dva stahují znovu.
+  - name: policie_mapa_kriminality
+    type: discover
+    page_url: https://kriminalita.policie.gov.cz/api/v2/downloads
+    link_regex: '"name"\s*:\s*"(20(?:2[3-9]|[3-9]\d)\d{2})"'
+    link_template: https://kriminalita.policie.gov.cz/api/v2/downloads/{}.zip
+    recheck_last: 2
+    every_days: 30
+
+  # Policie ČR – anonymizační oblasti s kódem obce (kod_obec, def_bod_x/y) pro přiřazení činů k obcím.
+  - name: policie_oblasti_obci
+    type: direct
+    url: https://kriminalita.policie.gov.cz/voronoi.geojson.zip
+    every_days: 90

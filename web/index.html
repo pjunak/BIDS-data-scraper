@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BIDS – sběr dat o nemovitostech</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,400..800&display=swap" rel="stylesheet">
+<style>
+:root {
+  color-scheme: light;
+  --paper: #f2f4ef;
+  --surface: #ffffff;
+  --ink: #1d2620;
+  --muted: #5d6b62;
+  --line: #cfd7cc;
+  --link: #2c5a8c;
+  --ok: #2e7d4e;
+  --fail: #b3261e;
+  --warn: #a86f00;
+  --empty: #e2e7df;
+  --font: "Archivo", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", "Consolas", "Liberation Mono", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #141a16; --surface: #1b231e; --ink: #e2e8e1; --muted: #9aa89f;
+    --line: #34413a; --link: #8db4e2; --ok: #6cc08b; --fail: #f08a80; --warn: #e2b04a; --empty: #26302a;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #141a16; --surface: #1b231e; --ink: #e2e8e1; --muted: #9aa89f;
+  --line: #34413a; --link: #8db4e2; --ok: #6cc08b; --fail: #f08a80; --warn: #e2b04a; --empty: #26302a;
+}
+
+* { box-sizing: border-box; }
+:root {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font: 400 16px/1.5 var(--font); font-stretch: 100%;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--link); text-underline-offset: 2px; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; border-radius: 2px; }
+
+.wrap { max-width: 1080px; margin: 0 auto; padding: 32px 20px 64px; }
+
+header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px 24px;
+         padding-bottom: 20px; border-bottom: 2px solid var(--ink); }
+h1 { margin: 0; font-size: clamp(28px, 5vw, 44px); line-height: 1.05; font-weight: 750; font-stretch: 82%;
+     letter-spacing: -0.01em; }
+h1 small { display: block; font-size: 16px; font-weight: 450; font-stretch: 100%; color: var(--muted);
+           letter-spacing: 0; margin-top: 6px; }
+.refresh { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 14px; }
+button { font: inherit; font-size: 14px; color: var(--ink); background: var(--surface); border: 1px solid var(--line);
+         border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+button:hover { border-color: var(--ink); }
+
+h2 { font-size: 22px; font-weight: 700; font-stretch: 90%; margin: 44px 0 4px; }
+.lede { margin: 0 0 16px; color: var(--muted); max-width: 70ch; }
+
+/* Sources: the signature element – one row per portal with a 30-night strip */
+.sources { border-top: 1px solid var(--line); }
+.src { display: grid; grid-template-columns: minmax(130px, 1fr) minmax(150px, 1.2fr) auto; gap: 8px 24px;
+       align-items: center; padding: 18px 0; border-bottom: 1px solid var(--line); }
+.src-name { font-size: 20px; font-weight: 700; font-stretch: 88%; }
+.src-meta { font-size: 14px; color: var(--muted); }
+.src-meta strong { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.state { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 14px; }
+.state::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
+.state.ok { color: var(--ok); } .state.failed { color: var(--fail); } .state.running { color: var(--warn); }
+.state.none { color: var(--muted); }
+
+.strip { display: grid; grid-template-columns: repeat(30, 14px); gap: 3px; justify-content: end; }
+.day { width: 14px; height: 26px; border-radius: 2px; background: var(--empty); position: relative; }
+.day.ok { background: var(--ok); } .day.failed { background: var(--fail); } .day.running { background: var(--warn); }
+.day.ok[data-weak] { opacity: .45; }
+.strip-legend { grid-column: 1 / -1; display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+.src-error { grid-column: 1 / -1; font-size: 14px; color: var(--fail); margin: 0; overflow-wrap: anywhere; }
+
+/* Data access */
+.access { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0 32px; }
+.access ul { list-style: none; margin: 0; padding: 0; }
+.access li { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.access li span { display: block; font-size: 14px; color: var(--muted); }
+.access h3 { font-size: 16px; font-weight: 700; margin: 12px 0 2px; }
+
+/* Tables */
+.table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-weight: 600; color: var(--muted); }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.msg { white-space: normal; min-width: 220px; color: var(--muted); overflow-wrap: anywhere; }
+tr:last-child td { border-bottom: 0; }
+
+/* Log */
+.log-bar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-bottom: 10px; font-size: 14px; }
+.log-bar label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+pre.log { margin: 0; max-height: 460px; overflow: auto; padding: 14px 16px; background: var(--surface);
+          border: 1px solid var(--line); border-radius: 6px; font: 12.5px/1.55 var(--mono); white-space: pre-wrap;
+          overflow-wrap: anywhere; }
+.log .e { color: var(--fail); font-weight: 600; } .log .w { color: var(--warn); }
+
+.notice { padding: 14px 16px; border-left: 4px solid var(--fail); background: var(--surface); margin-top: 24px; }
+.notice code { font-family: var(--mono); font-size: 13px; }
+.empty { color: var(--muted); font-size: 14px; padding: 12px 0; }
+footer { margin-top: 56px; color: var(--muted); font-size: 13px; }
+
+@media (max-width: 760px) {
+  .src { grid-template-columns: 1fr; }
+  .strip { justify-content: start; grid-template-columns: repeat(30, minmax(6px, 1fr)); width: 100%; }
+  .day { width: auto; height: 22px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .day { transition: transform .12s ease; }
+  .day:hover { transform: scaleY(1.15); }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Sběr dat o nemovitostech<small>Projekt BIDS – Jihomoravský kraj, Brno a okolí</small></h1>
+    <div class="refresh">
+      <span id="updated" aria-live="polite">Načítám…</span>
+      <button id="reload" type="button">Obnovit</button>
+    </div>
+  </header>
+
+  <div id="problem" class="notice" hidden></div>
+
+  <section aria-labelledby="h-src">
+    <h2 id="h-src">Inzeráty z portálů</h2>
+    <p class="lede">Každou noc se stáhnou všechny aktivní inzeráty. Čtverečky ukazují posledních 30 nocí: zelená je úspěšný běh, červená chyba, šedá znamená, že se ten den nestahovalo.</p>
+    <div class="sources" id="sources"></div>
+  </section>
+
+  <section aria-labelledby="h-data">
+    <h2 id="h-data">Přístup k datům</h2>
+    <p class="lede">Databáze se dá prohlížet a dotazovat živě, vždy s posledními staženými daty.</p>
+    <div class="access">
+      <div>
+        <h3>Prohlížení a SQL</h3>
+        <ul>
+          <li><a href="/db/collector">Otevřít databázi</a><span>Tabulky, filtry, vlastní SQL dotazy</span></li>
+          <li><a href="/db/collector/prehled_zdroju">Přehled podle zdrojů</a><span>Počet inzerátů a průměrná cena za m²</span></li>
+          <li><a href="/db/collector/nove_inzeraty">Nové inzeráty za 7 dní</a></li>
+          <li><a href="/db/collector/zlevnene">Inzeráty se změnou ceny</a></li>
+          <li><a href="/db/collector/listing_attributes">Vlastnosti nemovitostí</a><span>Stav, vlastnictví, energetická třída, pozemek</span></li>
+        </ul>
+      </div>
+      <div>
+        <h3>Stažení dat</h3>
+        <ul>
+          <li id="snapshot"><a href="/exports/collector-latest.sqlite.gz">Celá databáze (SQLite)</a><span>Načítám…</span></li>
+          <li><a href="/db/collector/listing_snapshot.csv?_stream=on&amp;_size=max">Všechny snímky inzerátů (CSV)</a><span>Celá časová řada, může být velké</span></li>
+          <li><a href="/db/collector/listing_lifecycle.csv?_stream=on&amp;_size=max">Životní cyklus inzerátů</a><span>První a poslední výskyt, změny ceny</span></li>
+          <li><a href="/db/collector/run.csv?_stream=on&amp;_size=max">Historie běhů (CSV)</a></li>
+          <li><a href="/exports/">Starší snapshoty databáze</a><span>Posledních 7 nocí</span></li>
+        </ul>
+      </div>
+      <div>
+        <h3>Sekundární zdroje</h3>
+        <ul id="downloads"><li class="empty">Načítám…</li></ul>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-runs">
+    <h2 id="h-runs">Poslední běhy</h2>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Úloha</th><th>Stav</th><th>Začátek</th><th>Trvání</th><th class="num">Položek</th><th>Poznámka</th></tr></thead>
+        <tbody id="runs"><tr><td colspan="6" class="empty">Načítám…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-log">
+    <h2 id="h-log">Log sběrače</h2>
+    <div class="log-bar">
+      <label><input type="checkbox" id="only-problems"> Jen varování a chyby</label>
+      <a href="/logs/">Všechny logy</a>
+    </div>
+    <pre class="log" id="log" tabindex="0" aria-label="Konec logu sběrače">Načítám…</pre>
+  </section>
+
+  <footer>Data slouží pouze pro školní projekt BIDS na PEF MENDELU. Kód: <a href="https://github.com/pjunak/BIDS-data-scraper">github.com/pjunak/BIDS-data-scraper</a></footer>
+</div>
+
+<script>
+const DB = "/db/collector.json";
+const SOURCES = [["sreality", "Sreality"], ["bezrealitky", "Bezrealitky"], ["idnes", "iDNES Reality"]];
+const DOWNLOAD_NAMES = {
+  mf_cenova_mapa_najemneho: "MF – cenová mapa nájemného",
+  gtfs_ids_jmk: "IDS JMK – jízdní řády (GTFS)",
+  csu_pocet_obyvatel_obce: "ČSÚ – počet obyvatel v obcích",
+  csu_mzdy_kraje: "ČSÚ – průměrné mzdy v krajích",
+  csu_median_mezd_kraje: "ČSÚ – průměr a medián mezd v krajích",
+  csu_ceny_nemovitosti: "ČSÚ – kupní ceny bytů a domů",
+  mpsv_nezamestnanost_obce: "MPSV – nezaměstnanost v obcích",
+  mpsv_nezamestnanost_obce_historie: "MPSV – nezaměstnanost v obcích 2014–2024",
+  policie_mapa_kriminality: "Policie ČR – mapa kriminality",
+  policie_oblasti_obci: "Policie ČR – oblasti obcí",
+};
+const STATE = { ok: "v pořádku", failed: "selhalo", running: "běží" };
+const nf = new Intl.NumberFormat("cs-CZ");
+const $ = (id) => document.getElementById(id);
+let loadedAt = null;
+
+async function q(sql) {
+  const u = new URL(DB, location.origin);
+  u.searchParams.set("sql", sql);
+  u.searchParams.set("_shape", "array");
+  const r = await fetch(u);
+  if (!r.ok) throw new Error(`Datasette vrátil ${r.status}`);
+  return r.json();
+}
+
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const parseTs = (s) => (s ? new Date(s) : null);
+const fmtDate = (d) => d ? d.toLocaleString("cs-CZ", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }) : "–";
+function ago(d) {
+  if (!d) return "nikdy";
+  const s = (Date.now() - d) / 1000;
+  if (s < 90) return "před chvílí";
+  if (s < 3600) return `před ${Math.round(s / 60)} min`;
+  if (s < 86400 * 2) return `před ${Math.round(s / 3600)} h`;
+  return `před ${Math.round(s / 86400)} dny`;
+}
+function duration(a, b) {
+  if (!a || !b) return "–";
+  const m = Math.round((b - a) / 60000);
+  return m < 1 ? "< 1 min" : m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`;
+}
+function jobLabel(job) {
+  const [kind, name] = job.split(":");
+  if (kind === "listings") return (SOURCES.find(([k]) => k === name) || [, name])[1];
+  if (kind === "export") return "Snapshot databáze";
+  return DOWNLOAD_NAMES[name] || name;
+}
+
+function renderSources(last, strip, active) {
+  const days = [...Array(30)].map((_, i) => {
+    const d = new Date(); d.setUTCHours(0, 0, 0, 0); d.setUTCDate(d.getUTCDate() - (29 - i));
+    return d.toISOString().slice(0, 10);
+  });
+  $("sources").innerHTML = SOURCES.map(([key, label]) => {
+    const r = last.find((x) => x.job === `listings:${key}`);
+    const st = r ? r.status : "none";
+    const byDay = {};
+    strip.filter((x) => x.job === `listings:${key}`).forEach((x) => {
+      // a failed run does not hide a successful one from the same night
+      if (!byDay[x.d] || x.status === "ok") byDay[x.d] = x;
+    });
+    const maxItems = Math.max(1, ...Object.values(byDay).map((x) => x.items || 0));
+    const cells = days.map((d) => {
+      const x = byDay[d];
+      const title = x ? `${d}: ${STATE[x.status] || x.status}, ${nf.format(x.items || 0)} inzerátů` : `${d}: bez běhu`;
+      const weak = x && x.status === "ok" && x.items < maxItems * 0.5 ? " data-weak" : "";
+      return `<span class="day ${x ? x.status : ""}"${weak} title="${esc(title)}" role="img" aria-label="${esc(title)}"></span>`;
+    }).join("");
+    const act = active.find((x) => x.source === key);
+    return `<div class="src">
+      <div><div class="src-name">${label}</div>
+        <span class="state ${st}">${r ? STATE[st] || st : "zatím nestaženo"}</span></div>
+      <div class="src-meta">
+        Poslední běh <strong>${ago(parseTs(r && r.started_at))}</strong><br>
+        Aktivních inzerátů <strong>${act ? nf.format(act.n) : "–"}</strong>
+      </div>
+      <div class="strip" aria-label="Posledních 30 nocí">${cells}
+        <div class="strip-legend"><span>před 30 dny</span><span>dnes</span></div></div>
+      ${r && r.status === "failed" && r.message ? `<p class="src-error">${esc(r.message)}</p>` : ""}
+    </div>`;
+  }).join("");
+}
+
+function renderDownloads(files, last) {
+  const names = new Set([...files.map((f) => f.name), ...last.filter((r) => r.job.startsWith("download:")).map((r) => r.job.slice(9))]);
+  if (!names.size) { $("downloads").innerHTML = `<li class="empty">Zatím nic nestaženo.</li>`; return; }
+  $("downloads").innerHTML = [...names].sort().map((n) => {
+    const f = files.find((x) => x.name === n);
+    const r = last.find((x) => x.job === `download:${n}`);
+    const failed = r && r.status === "failed" ? ` <span class="state failed">poslední pokus selhal</span>` : "";
+    const sub = f ? `${nf.format(f.versions)} ${f.versions === 1 ? "verze" : "verzí"}, poslední ${fmtDate(parseTs(f.last))}` : "zatím bez souboru";
+    return `<li><a href="/files/${encodeURIComponent(n)}/">${esc(DOWNLOAD_NAMES[n] || n)}</a>${failed}<span>${sub}</span></li>`;
+  }).join("");
+}
+
+function renderRuns(runs) {
+  if (!runs.length) { $("runs").innerHTML = `<tr><td colspan="6" class="empty">Zatím žádný běh. Sběrač se spouští každou noc ve 3:15.</td></tr>`; return; }
+  $("runs").innerHTML = runs.map((r) => {
+    const a = parseTs(r.started_at), b = parseTs(r.finished_at);
+    return `<tr><td>${esc(jobLabel(r.job))}</td><td><span class="state ${r.status}">${STATE[r.status] || r.status}</span></td>
+      <td>${fmtDate(a)}</td><td>${r.status === "running" ? "běží…" : duration(a, b)}</td>
+      <td class="num">${nf.format(r.items || 0)}</td><td class="msg">${esc(r.message)}</td></tr>`;
+  }).join("");
+}
+
+let logLines = [];
+function renderLog() {
+  const only = $("only-problems").checked;
+  const lines = only ? logLines.filter((l) => / (WARNING|ERROR|CRITICAL) /.test(l) || /^\s|Traceback/.test(l)) : logLines;
+  const el = $("log");
+  const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+  el.innerHTML = lines.length ? lines.map((l) => {
+    const cls = / (ERROR|CRITICAL) |Traceback/.test(l) ? "e" : / WARNING /.test(l) ? "w" : "";
+    return cls ? `<span class="${cls}">${esc(l)}</span>` : esc(l);
+  }).join("\n") : (only ? "Žádná varování ani chyby." : "Log je zatím prázdný.");
+  if (atBottom || !el.dataset.init) { el.scrollTop = el.scrollHeight; el.dataset.init = 1; }
+}
+async function loadLog() {
+  try {
+    const r = await fetch("/logs/collector.log", { headers: { Range: "bytes=-60000" }, cache: "no-store" });
+    if (r.status === 416 || r.status === 404) { logLines = []; return renderLog(); }
+    let text = await r.text();
+    if (r.status === 206) text = text.slice(text.indexOf("\n") + 1); // drop the cut-off first line
+    logLines = text.trimEnd().split("\n").slice(-300);
+  } catch { logLines = ["Log se nepodařilo načíst."]; }
+  renderLog();
+}
+
+async function loadSnapshot() {
+  const span = $("snapshot").querySelector("span");
+  try {
+    const r = await fetch("/api/exports/", { cache: "no-store" });
+    if (!r.ok) throw new Error();
+    const files = (await r.json()).filter((f) => /^collector-\d{4}-\d{2}-\d{2}\.sqlite\.gz$/.test(f.name));
+    if (!files.length) { span.textContent = "Zatím nevznikl, první snapshot se vytvoří po nočním sběru."; return; }
+    const f = files.sort((a, b) => a.name.localeCompare(b.name)).at(-1);
+    const size = f.size >= 1e6 ? `${(f.size / 1e6).toLocaleString("cs-CZ", { maximumFractionDigits: 1 })} MB`
+                               : `${Math.max(1, Math.round(f.size / 1e3))} kB`;
+    span.textContent = `Gzip, ${size}, vytvořeno ${fmtDate(new Date(f.mtime))}. Otevřete v DB Browser for SQLite, pandas nebo SSIS.`;
+  } catch { span.textContent = "Informace o snapshotu se nepodařilo načíst."; }
+}
+
+async function load() {
+  $("updated").textContent = "Načítám…";
+  try {
+    const [last, strip, active, files, runs] = await Promise.all([
+      q("SELECT job, status, items, started_at, finished_at, message FROM run WHERE id IN (SELECT MAX(id) FROM run GROUP BY job)"),
+      q("SELECT job, substr(started_at, 1, 10) AS d, status, items FROM run WHERE job LIKE 'listings:%' AND started_at >= date('now', '-30 days') ORDER BY id"),
+      q("SELECT source, COUNT(*) AS n FROM listing_snapshot WHERE run_id IN (SELECT MAX(id) FROM run WHERE status = 'ok' AND job LIKE 'listings:%' GROUP BY job) GROUP BY source"),
+      q("SELECT name, MAX(fetched_at) AS last, COUNT(*) AS versions FROM download GROUP BY name"),
+      q("SELECT job, status, items, started_at, finished_at, message FROM run ORDER BY id DESC LIMIT 25"),
+    ]);
+    $("problem").hidden = true;
+    renderSources(last, strip, active);
+    renderDownloads(files, last);
+    renderRuns(runs);
+  } catch (e) {
+    $("problem").hidden = false;
+    $("problem").innerHTML = `Databázi se nepodařilo načíst (${esc(e.message)}). Pokud sběrač ještě neproběhl, databáze neexistuje. Na serveru v <code>/opt/stacks/bids</code> zkontrolujte <code>docker compose ps</code> a <code>docker compose logs datasette</code>.`;
+    $("sources").innerHTML = "";
+  }
+  await Promise.all([loadLog(), loadSnapshot()]);
+  loadedAt = new Date();
+  tick();
+}
+function tick() { if (loadedAt) $("updated").textContent = `Aktualizováno ${ago(loadedAt)}`; }
+
+$("reload").addEventListener("click", load);
+$("only-problems").addEventListener("change", renderLog);
+setInterval(tick, 15000);
+setInterval(() => { if (!document.hidden) load(); }, 60000);
+load();
+</script>
+</body>
+</html>

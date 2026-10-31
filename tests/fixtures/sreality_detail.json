@@ -1,0 +1,47 @@
+{
+ "result": {
+  "hash_id": 567742540,
+  "advert_name": "Prodej bytu 2+kk 81 m²",
+  "building_condition": {
+   "name": "Novostavba",
+   "value": 6
+  },
+  "ownership": {
+   "name": "Osobní",
+   "value": 1
+  },
+  "energy_efficiency_rating_cb": {
+   "name": "B - Velmi úsporná",
+   "value": 2
+  },
+  "usable_area": 81,
+  "category_main_cb": {
+   "name": "Byty",
+   "value": 1
+  },
+  "category_sub_cb": {
+   "name": "2+kk",
+   "value": 4
+  },
+  "category_type_cb": {
+   "name": "Prodej",
+   "value": 1
+  },
+  "price_czk": 13715000.0,
+  "user": {
+   "user_name": "Makléř",
+   "user_email": "makler@example.cz",
+   "user_phones": [
+    {
+     "phone": "+420000000000"
+    }
+   ]
+  },
+  "labels": [
+   {
+    "name": "tavern"
+   }
+  ]
+ },
+ "status_code": 200
+}

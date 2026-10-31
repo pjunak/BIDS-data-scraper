@@ -1,0 +1,34 @@
+{
+ "data": {
+  "listAdverts": {
+   "totalCount": 1,
+   "list": [
+    {
+     "id": "1000001",
+     "uri": "1000001-nabidka-prodej-bytu-ukazkova-brno",
+     "offerType": "PRODEJ",
+     "estateType": "BYT",
+     "disposition": "DISP_3_KK",
+     "surface": 78,
+     "surfaceLand": null,
+     "price": 7699000,
+     "charges": 0,
+     "currency": "CZK",
+     "originalPrice": 7790000,
+     "condition": "AFTER_RECONSTRUCTION",
+     "ownership": "OSOBNI",
+     "penb": "G",
+     "isNew": false,
+     "etage": 2,
+     "reserved": false,
+     "address": "Ukázková, Brno - Černovice, Jihomoravský kraj",
+     "imageAltText": "Prodej bytu 3+kk 78 m², Ukázková, Brno",
+     "gps": {
+      "lat": 49.18,
+      "lng": 16.63
+     }
+    }
+   ]
+  }
+ }
+}

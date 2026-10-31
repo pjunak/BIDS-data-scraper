@@ -1,0 +1,137 @@
+name: Build and dispatch
+
+# Tests run on every push and pull request. Main also publishes a verified image
+# and hands its digest to infra's Deploy (stack `bids`, https://bids.junak.eu).
+# Required: INFRA_REPO variable and the shared INFRA_DISPATCH_TOKEN secret.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bids-${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && 'production' || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Python tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m unittest discover -s tests -v
+
+  build:
+    name: Verify and build image
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_ref: ${{ steps.publish.outputs.digest && format('{0}@{1}', steps.img.outputs.name, steps.publish.outputs.digest) || '' }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Lowercase image name
+        id: img
+        env:
+          REPO: ${{ github.repository }}
+        run: echo "name=ghcr.io/${REPO,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Build the image for verification
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: bids-data-scraper:local
+          labels: org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max,ignore-error=true
+
+      - name: Smoke-test dashboard, Datasette and nginx without touching the portals
+        run: |
+          set -euo pipefail
+          docker run --rm bids-data-scraper:local nginx -e stderr -c /app/web/nginx.conf -t
+          docker run --rm bids-data-scraper:local python -m collector --help >/dev/null
+          mkdir -m 777 data
+          docker compose run --rm --no-deps collector python -m collector status
+          docker compose up -d --no-build --no-deps datasette web
+          trap 'docker compose logs; docker compose down' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent --max-time 2 http://127.0.0.1:8080/db/collector.json >/dev/null; then break; fi
+            if [[ "$attempt" == 30 ]]; then exit 1; fi
+            sleep 1
+          done
+          for path in / /healthz /db/collector/listing_attributes.json /db/collector/posledni_behy.json /logs/; do
+            curl --fail --silent --show-error --max-time 10 "http://127.0.0.1:8080${path}" >/dev/null
+          done
+          code=$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:8080/nginx.conf)
+          [[ "$code" == 404 ]]
+
+      - name: Skip superseded main revisions
+        id: current
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          main_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)"
+          [[ "$main_sha" =~ ^[a-f0-9]{40}$ ]]
+          if [[ "$main_sha" == "$GITHUB_SHA" ]]; then
+            echo 'current=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'current=false' >> "$GITHUB_OUTPUT"
+            echo '::notice::A newer main revision exists; publication and deployment skipped.'
+          fi
+
+      - name: Publish the verified build
+        id: publish
+        if: steps.current.outputs.current == 'true'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          labels: org.opencontainers.image.revision=${{ github.sha }}
+          tags: |
+            ${{ steps.img.outputs.name }}:latest
+            ${{ steps.img.outputs.name }}:sha-${{ github.sha }}
+          cache-from: type=gha
+
+  deploy:
+    name: Hand the image to infra
+    needs: build
+    if: needs.build.outputs.image_ref != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Dispatch infra's Deploy for bids
+        env:
+          GH_TOKEN: ${{ secrets.INFRA_DISPATCH_TOKEN }}
+          INFRA_REPO: ${{ vars.INFRA_REPO }}
+          IMAGE_REF: ${{ needs.build.outputs.image_ref }}
+        run: |
+          set -euo pipefail
+          gh workflow run deploy.yml --repo "$INFRA_REPO" --ref main -f service=bids -f image_ref="$IMAGE_REF"
+          echo "Deploying \`$IMAGE_REF\`; result: https://github.com/$INFRA_REPO/actions/workflows/deploy.yml" >> "$GITHUB_STEP_SUMMARY"

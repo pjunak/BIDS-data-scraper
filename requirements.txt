@@ -1,0 +1,5 @@
+requests==2.32.3
+beautifulsoup4==4.12.3
+PyYAML==6.0.2
+tzdata==2024.2
+datasette==0.65.5

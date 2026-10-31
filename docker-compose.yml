@@ -1,0 +1,36 @@
+# Local run of the whole project (dashboard at http://127.0.0.1:8080, data in ./data).
+# Production runs the published image from pjunak/infra (stacks/bids), which mirrors this file.
+name: bids-local
+
+services:
+  collector:
+    build: .
+    image: bids-data-scraper:local
+    command: [python, -m, collector, daemon]
+    environment:
+      TZ: Europe/Prague
+    volumes:
+      - ./data:/data
+    healthcheck:
+      test: [CMD, python, -c, "import os, sys; sys.exit(not os.path.exists('/data/collector.sqlite'))"]
+      interval: 10s
+      start_period: 10s
+
+  datasette:
+    image: bids-data-scraper:local
+    command: >
+      datasette serve /data/collector.sqlite --metadata /app/datasette/metadata.yml
+      -h 0.0.0.0 -p 8001 --setting base_url /db/
+      --setting sql_time_limit_ms 15000 --setting max_returned_rows 5000
+    volumes:
+      - ./data:/data    # WAL readers need to write the -shm file; the data are only read
+    depends_on:
+      collector: {condition: service_healthy}
+
+  web:
+    image: bids-data-scraper:local
+    command: [nginx, -e, stderr, -c, /app/web/nginx.conf, -g, "daemon off;"]
+    volumes:
+      - ./data:/data:ro
+    ports:
+      - "127.0.0.1:8080:8080"

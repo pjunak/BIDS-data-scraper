@@ -1,0 +1,45 @@
+title: BIDS – data z realitních portálů
+description: Živá databáze sběrače (jen pro čtení). Data jsou určena pouze pro školní projekt.
+databases:
+  collector:
+    tables:
+      run: {description: "Každý běh sběrače: úloha, stav, počet položek, chyba."}
+      listing_snapshot: {description: "Jeden řádek = jeden inzerát v jednom dni."}
+      listing_payload: {description: "Surová data z portálů (JSON), uložená při každé změně."}
+      listing_detail: {description: "Surové detaily inzerátů (Sreality)."}
+      download: {description: "Stažené soubory sekundárních zdrojů."}
+      listing_lifecycle: {description: "Pohled: první a poslední výskyt inzerátu, počet změn ceny."}
+      listing_attributes: {description: "Pohled: stav, vlastnictví, energetická třída, plocha pozemku a novostavba (Sreality z detailu, Bezrealitky ze surových dat)."}
+    queries:
+      posledni_behy:
+        title: Poslední běhy
+        sql: SELECT id, job, status, items, started_at, finished_at, message FROM run ORDER BY id DESC LIMIT 100
+      prehled_zdroju:
+        title: Počet inzerátů podle zdroje a typu
+        sql: |
+          SELECT s.source, s.estate_type, s.offer_type, COUNT(*) AS inzeraty,
+                 ROUND(AVG(CASE WHEN s.area_m2 > 0 THEN s.price / s.area_m2 END)) AS prumer_kc_m2
+          FROM listing_snapshot s
+          WHERE s.run_id IN (SELECT MAX(id) FROM run WHERE status = 'ok' AND job LIKE 'listings:%' GROUP BY job)
+          GROUP BY 1, 2, 3 ORDER BY 1, 2, 3
+      nove_inzeraty:
+        title: Nové inzeráty za posledních 7 dní
+        sql: |
+          SELECT source, offer_type, estate_type, title, price, area_m2, locality, first_seen, url
+          FROM listing_lifecycle JOIN listing_snapshot USING (source, listing_id)
+          WHERE first_seen >= datetime('now', '-7 days') AND scraped_at = last_seen
+          ORDER BY first_seen DESC LIMIT 1000
+      novostavby:
+        title: Cena za m² – novostavby vs. ostatní (poslední úspěšný běh)
+        sql: |
+          SELECT s.source, s.offer_type, s.estate_type, COALESCE(a.is_new_build, 0) AS novostavba,
+                 COUNT(*) AS inzeraty, ROUND(AVG(s.price / s.area_m2)) AS prumer_kc_m2
+          FROM listing_snapshot s JOIN listing_attributes a USING (source, listing_id)
+          WHERE s.area_m2 > 0 AND s.price > 0
+            AND s.run_id IN (SELECT MAX(id) FROM run WHERE status = 'ok' AND job LIKE 'listings:%' GROUP BY job)
+          GROUP BY 1, 2, 3, 4 ORDER BY 1, 2, 3, 4
+      zlevnene:
+        title: Inzeráty se změnou ceny
+        sql: |
+          SELECT source, listing_id, first_seen, last_seen, n_snapshots, max_price, min_price, n_price_changes
+          FROM listing_lifecycle WHERE n_price_changes > 0 ORDER BY n_price_changes DESC LIMIT 1000
