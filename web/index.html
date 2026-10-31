@@ -133,6 +133,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: 13px; }
     <div class="refresh">
       <span id="updated" aria-live="polite">Načítám…</span>
       <button id="reload" type="button">Obnovit</button>
+      <a href="/auth/logout">Odhlásit</a>
     </div>
   </header>
 
@@ -222,6 +223,10 @@ async function q(sql) {
   u.searchParams.set("sql", sql);
   u.searchParams.set("_shape", "array");
   const r = await fetch(u);
+  if (r.redirected && new URL(r.url).pathname === "/login") {  // session expired
+    location.href = "/login?next=/";
+    throw new Error("přihlášení vypršelo");
+  }
   if (!r.ok) throw new Error(`Datasette vrátil ${r.status}`);
   return r.json();
 }

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>BIDS – přihlášení</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,400..800&display=swap" rel="stylesheet">
+<style>
+:root {
+  color-scheme: light;
+  --paper: #f2f4ef; --surface: #ffffff; --ink: #1d2620; --muted: #5d6b62; --line: #cfd7cc;
+  --link: #2c5a8c; --fail: #b3261e;
+  --font: "Archivo", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #141a16; --surface: #1b231e; --ink: #e2e8e1; --muted: #9aa89f; --line: #34413a; --link: #8db4e2; --fail: #f08a80;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #141a16; --surface: #1b231e; --ink: #e2e8e1; --muted: #9aa89f; --line: #34413a; --link: #8db4e2; --fail: #f08a80;
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px 16px;
+       background: var(--paper); color: var(--ink); font: 400 16px/1.5 var(--font); -webkit-font-smoothing: antialiased; }
+main { width: 100%; max-width: 380px; }
+h1 { margin: 0 0 4px; font-size: 32px; line-height: 1.05; font-weight: 750; font-stretch: 82%; letter-spacing: -0.01em; }
+p { margin: 0 0 24px; color: var(--muted); }
+form { padding-top: 20px; border-top: 2px solid var(--ink); }
+label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 6px; }
+input { width: 100%; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line);
+        border-radius: 6px; padding: 10px 12px; }
+input:focus-visible, button:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+button { margin-top: 16px; width: 100%; font: inherit; font-weight: 600; color: var(--paper); background: var(--ink);
+         border: 0; border-radius: 6px; padding: 10px 12px; cursor: pointer; }
+.error { color: var(--fail); font-size: 14px; margin: 10px 0 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Sběr dat o nemovitostech</h1>
+  <p>Projekt BIDS – přístup jen pro tým.</p>
+  <form method="post" action="/auth/login">
+    <label for="password">Heslo</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required autofocus>
+    <input id="next" name="next" type="hidden" value="/">
+    <p class="error" id="error" role="alert" hidden>Špatné heslo.</p>
+    <button type="submit">Přihlásit</button>
+  </form>
+</main>
+<script>
+// nginx sends the original address as the last parameter, unencoded: /login?next=/db/x?sql=...
+const q = location.search;
+const i = q.indexOf("next=");
+if (i >= 0) document.getElementById("next").value = q.slice(i + 5) || "/";
+document.getElementById("error").hidden = !/[?&]error=1/.test(q);
+</script>
+</body>
+</html>

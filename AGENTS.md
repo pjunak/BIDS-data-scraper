@@ -13,7 +13,7 @@ facing README, config comments and dashboard are in Czech, keep that.
 pip install -r requirements.txt
 python -m unittest discover -s tests -v     # offline; never touches the real portals
 python -m collector --config <file> listings --source sreality --max-pages 1   # live check
-docker compose up --build                   # local stack on http://127.0.0.1:8080
+cp .env.example .env && docker compose up --build   # local stack on http://127.0.0.1:8080
 ```
 
 Snapshot tests create a symlink and fail on Windows without symlink rights;
@@ -26,15 +26,16 @@ collector/sources/   one module per portal: iter_listings() -> (record, raw payl
 collector/db.py      SQLite schema and views (views are recreated on every connect)
 config.yaml          sources, schedule, downloads; baked into the image
 datasette/           table descriptions and canned queries for /db/
-web/                 dashboard (index.html) and nginx.conf (runs non-root on 8080)
+web/                 dashboard, login page + auth.py (password check), nginx.conf (non-root, :8080)
 tests/fixtures/      trimmed real portal responses
 ```
 
 ## Invariants
 
-- One image runs all three services (collector, Datasette, nginx): infra's
+- One image runs all four services (collector, Datasette, auth, nginx): infra's
   digest deploy pins every service of a stack to one image. Production Compose,
-  Caddy route and login live in `pjunak/infra` (`stacks/bids`, `stacks/caddy`);
+  the Caddy route and the server's password `.env` belong to `pjunak/infra`
+  (`stacks/bids`, `stacks/caddy`);
   keep `docker-compose.yml` here in step with `stacks/bids`.
 - Main CI tests, builds, smoke-tests and dispatches infra's Deploy with
   `service=bids` and the image digest. Pushing `main` deploys.
@@ -42,6 +43,10 @@ tests/fixtures/      trimmed real portal responses
   broker contacts or other personal data (see `DROP_DETAIL` in `sreality.py`).
 - A source change must fail loudly (run `failed`), never save empty data. One
   failing source must not stop the others.
+- Everything except /login, /auth/login, /auth/logout and /healthz sits behind
+  nginx `auth_request` to `web/auth.py`. Login is password-only: each
+  `BIDS_PASSWORD_HASH_<ROLE>` is one password and the password picks the role.
+  `auth.py` uses the standard library only.
 - Datasette's `base_url` only prefixes its links; nginx strips `/db/` before
   proxying.
 - Every SQL in `web/index.html` and `datasette/metadata.yml` must run on the

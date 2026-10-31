@@ -6,7 +6,7 @@ Sběr dat pro projekt BIDS (trh s nemovitostmi v Jihomoravském kraji, Brno vs. 
   (byty + domy, prodej + pronájem) a vytvoří se snapshot celé databáze ke stažení.
 - **Týdně / měsíčně** se stahují **sekundární zdroje** (MF cenová mapa nájemného, jízdní řády IDS JMK, ČSÚ…)
   a archivuje se každá nová verze.
-- **https://bids.junak.eu** (jméno a heslo pro tým) ukazuje živý stav sběru, logy, prohlížení databáze
+- **https://bids.junak.eu** (jen heslo, žádné jméno) ukazuje živý stav sběru, logy, prohlížení databáze
   přes SQL a stažení dat (celá SQLite databáze nebo CSV).
 
 Zdroje, KPI a poznámky k ETL jsou v [docs/project.md](docs/project.md).
@@ -18,17 +18,26 @@ push do main ─▶ GitHub Actions: testy, build obrazu, smoke test ─▶ ghcr.
                                                                      │ digest
                                                                      ▼
                                      pjunak/infra Deploy (stack „bids“) ─▶ server /opt/stacks/bids
-Server: jeden obraz, tři služby
+Server: jeden obraz, čtyři služby
   ├─ bids-collector   python -m collector daemon (plánuje sám sebe)     ┐
   ├─ bids-datasette   živá databáze jen pro čtení, /db/                 ├─▶ ./data
-  └─ bids             nginx: přehled, /logs/, /files/, /exports/        ┘
+  ├─ bids-auth        kontrola hesla a session (web/auth.py)            │
+  └─ bids             nginx: přihlášení, přehled, /logs/, /files/, …    ┘
         ▲
-Caddy (HTTPS + basic auth) ◀── bids.junak.eu
+Caddy (HTTPS) ◀── bids.junak.eu
 ```
 
 **Kód** je v gitu, **data** jen na serveru v `/opt/stacks/bids/data`. Nasazení data neohrozí.
-Produkční Compose soubor, přihlašovací údaje a směrování jsou v repozitáři `pjunak/infra`
-(`stacks/bids`, `stacks/caddy`); `docker-compose.yml` tady slouží k lokálnímu běhu.
+Produkční Compose soubor a směrování jsou v repozitáři `pjunak/infra` (`stacks/bids`, `stacks/caddy`);
+`docker-compose.yml` tady slouží k lokálnímu běhu.
+
+## Přihlášení
+
+Web chce jen heslo. Každý řádek `BIDS_PASSWORD_HASH_<ROLE>` v `.env` je jedno heslo a heslo samo určuje
+roli (zatím jen `user`, admin později = další řádek). Přihlášení platí 30 dní, změna hesla odhlásí všechny
+s tou rolí, pokusů je nejvýš 10 za minutu z jedné adresy. Hash hesla vytvoří `python web/auth.py hash`
+(na serveru viz `stacks/bids/README.md` v infra). Kontrolu dělá nginx (`auth_request`) proti službě
+`auth`, takže je chráněné všechno včetně `/db/`, `/exports/`, `/files/` a `/logs/`.
 
 ## Struktura repozitáře
 
@@ -40,7 +49,7 @@ collector/            sběrač
   db.py               schéma databáze a pohledy
 config.yaml           co a kdy se stahuje (zdroje, URL, plán); je součástí obrazu
 datasette/            popis tabulek a připravené dotazy pro /db/
-web/                  přehledová stránka + nginx
+web/                  přehled, přihlášení (login.html, auth.py) + nginx
 tests/                offline testy, nikdy nesahají na skutečné portály; fixtures/ = zkrácené skutečné odpovědi
 .github/workflows/    testy, build a předání obrazu do infra
 ```
@@ -89,6 +98,7 @@ Lokálně:
 
 ```bash
 python -m unittest discover -s tests -v       # testy (bez Dockeru, bez internetu)
+cp .env.example .env                          # heslo change-me-please, nebo vlastní hash
 docker compose up --build                     # celý projekt na http://127.0.0.1:8080, data v ./data
 ```
 

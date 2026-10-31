@@ -1,4 +1,5 @@
-# Local run of the whole project (dashboard at http://127.0.0.1:8080, data in ./data).
+# Local run of the whole project (dashboard at http://127.0.0.1:8080, data in ./data,
+# password hash in .env).
 # Production runs the published image from pjunak/infra (stacks/bids), which mirrors this file.
 name: bids-local
 
@@ -26,6 +27,11 @@ services:
       - ./data:/data    # WAL readers need to write the -shm file; the data are only read
     depends_on:
       collector: {condition: service_healthy}
+
+  auth:
+    image: bids-data-scraper:local
+    command: [python, /app/web/auth.py, serve]
+    env_file: .env    # BIDS_PASSWORD_HASH_USER=... from `python web/auth.py hash`, see .env.example
 
   web:
     image: bids-data-scraper:local
