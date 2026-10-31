@@ -91,6 +91,7 @@ jobs:
           done
           [[ "$(status "$base/db/collector.json")" == "303 /login?next=/db/collector.json" ]]
           [[ "$(status "$base/db")" == "301 /db/" ]]
+          [[ "$(status -X POST "$base/api/run")" == "303 /login?next=/api/run" ]]
           [[ "$(status "$base/login")" == "200 " ]]
           [[ "$(status -d password=wrong -d next=/ "$base/auth/login")" == "303 /login?error=1&next=/" ]]
           cookie=$(curl --silent --output /dev/null --dump-header - -d password=ci-password -d next=/ "$base/auth/login" \

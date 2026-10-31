@@ -63,6 +63,10 @@ h1 small { display: block; font-size: 16px; font-weight: 450; font-stretch: 100%
 button { font: inherit; font-size: 14px; color: var(--ink); background: var(--surface); border: 1px solid var(--line);
          border-radius: 6px; padding: 6px 12px; cursor: pointer; }
 button:hover { border-color: var(--ink); }
+button.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); font-weight: 600; }
+button:disabled { opacity: .5; cursor: default; }
+.run-now { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 16px; font-size: 14px;
+           color: var(--muted); }
 
 h2 { font-size: 22px; font-weight: 700; font-stretch: 90%; margin: 44px 0 4px; }
 .lede { margin: 0 0 16px; color: var(--muted); max-width: 70ch; }
@@ -142,6 +146,10 @@ footer { margin-top: 56px; color: var(--muted); font-size: 13px; }
   <section aria-labelledby="h-src">
     <h2 id="h-src">Inzeráty z portálů</h2>
     <p class="lede">Každou noc se stáhnou všechny aktivní inzeráty. Čtverečky ukazují posledních 30 nocí: zelená je úspěšný běh, červená chyba, šedá znamená, že se ten den nestahovalo.</p>
+    <div class="run-now">
+      <button id="run-now" type="button" class="primary" disabled>Spustit sběr teď</button>
+      <span id="run-state" aria-live="polite">Načítám…</span>
+    </div>
     <div class="sources" id="sources"></div>
   </section>
 
@@ -348,6 +356,39 @@ async function loadSnapshot() {
   } catch { span.textContent = "Informace o snapshotu se nepodařilo načíst."; }
 }
 
+const fmtTime = (d) => d.toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit" });
+function renderRun(s, note) {
+  $("run-now").disabled = s.running || !!s.next_allowed;
+  $("run-state").textContent = note || (s.running ? "Sběr právě běží, obvykle trvá 10–20 minut."
+    : s.next_allowed ? `Další ruční sběr půjde spustit v ${fmtTime(new Date(s.next_allowed))}.`
+    : "Stáhne všechny portály hned, nečeká na noc.");
+}
+async function loadRun() {
+  try {
+    const r = await fetch("/api/run", { cache: "no-store" });
+    if (!r.ok) throw new Error();
+    renderRun(await r.json());
+  } catch {
+    $("run-now").disabled = true;
+    $("run-state").textContent = "Stav sběrače se nepodařilo zjistit.";
+  }
+}
+$("run-now").addEventListener("click", async () => {
+  if (!confirm("Spustit sběr všech portálů teď? Trvá obvykle 10–20 minut a další ruční sběr půjde až za hodinu.")) return;
+  $("run-now").disabled = true;
+  try {
+    const r = await fetch("/api/run", { method: "POST" });
+    if (r.redirected) { location.href = "/login?next=/"; return; }  // session expired
+    const s = await r.json();
+    renderRun(s, r.status === 202 ? "Sběr spuštěn. Průběh je vidět v posledních bězích a v logu níže."
+      : r.status === 409 ? "Sběr už běží." : null);
+    setTimeout(load, 3000);
+  } catch {
+    $("run-state").textContent = "Sběr se nepodařilo spustit.";
+    $("run-now").disabled = false;
+  }
+});
+
 async function load() {
   $("updated").textContent = "Načítám…";
   try {
@@ -367,7 +408,7 @@ async function load() {
     $("problem").innerHTML = `Databázi se nepodařilo načíst (${esc(e.message)}). Pokud sběrač ještě neproběhl, databáze neexistuje. Na serveru v <code>/opt/stacks/bids</code> zkontrolujte <code>docker compose ps</code> a <code>docker compose logs datasette</code>.`;
     $("sources").innerHTML = "";
   }
-  await Promise.all([loadLog(), loadSnapshot()]);
+  await Promise.all([loadLog(), loadSnapshot(), loadRun()]);
   loadedAt = new Date();
   tick();
 }

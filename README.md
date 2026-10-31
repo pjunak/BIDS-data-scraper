@@ -81,6 +81,12 @@ Výsledek nasazení je v Actions repozitáře infra. Na server se odsud nikdo ne
 
 Změna `config.yaml` (zdroje, čas sběru) je změna obrazu, tedy push sem.
 
+## Ruční sběr
+
+Tlačítko **Spustit sběr teď** na přehledu stáhne všechny portály hned (a pak vytvoří snapshot), bez čekání
+na noc. Požadavek převezme běžící sběrač (`collector/trigger.py`), takže se ruční a noční sběr nikdy
+nepřekrývají. Ruční sběr jde nejvýš jednou za hodinu (`schedule.manual_cooldown_min` v `config.yaml`).
+
 ## Příkazy
 
 Na serveru (`cd /opt/stacks/bids`):

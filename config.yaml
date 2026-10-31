@@ -11,6 +11,7 @@ request_delay_s: 1.5
 schedule:
   listings_at: "03:15"   # inzeráty jednou denně (čas Europe/Prague)
   run_on_start: false    # true = po startu kontejneru hned jedno stažení
+  manual_cooldown_min: 60  # tlačítko Spustit sběr na webu: nejvýš jeden ruční sběr za tuto dobu
 
 # ---------------------------------------------------------------------------
 # PRIMÁRNÍ DATA – inzeráty (každý den, snímek všech aktivních inzerátů)

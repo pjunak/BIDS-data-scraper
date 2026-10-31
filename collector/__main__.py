@@ -2,11 +2,10 @@ import argparse
 import logging
 import logging.handlers
 import os
-import time
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from . import config, db, export, jobs
+from . import config, db, export, jobs, trigger
 
 log = logging.getLogger("collector")
 
@@ -17,21 +16,28 @@ def daemon(cfg):
     hh, mm = map(int, cfg["schedule"]["listings_at"].split(":"))
     db.connect(cfg["db_path"]).close()  # create the DB right away so Datasette can open it
     log.info("daemon started, listings daily at %02d:%02d %s", hh, mm, tz)
-    if cfg["schedule"].get("run_on_start", False):
+
+    def scrape():
         jobs.run_listings(cfg)
         jobs.run_snapshot(cfg)
+
+    manual = trigger.Trigger(cfg["schedule"].get("manual_cooldown_min", 60) * 60)
+    trigger.serve(manual, int(os.environ.get("TRIGGER_PORT", "8082")))
+    if cfg["schedule"].get("run_on_start", False):
+        manual.run(scrape)
     while True:
         jobs.run_downloads(cfg)  # each item decides itself whether it is due
         now = datetime.now(tz)
         nxt = now.replace(hour=hh, minute=mm, second=0, microsecond=0)
         if nxt <= now:
             nxt += timedelta(days=1)
-        # wake up at most hourly so downloads are checked and logs show we are alive
+        # wake up at most hourly so downloads are checked and logs show we are alive,
+        # or right away when the dashboard asks for a manual run
         sleep_s = min((nxt - now).total_seconds(), 3600)
-        time.sleep(max(sleep_s, 1))
-        if datetime.now(tz) >= nxt:
-            jobs.run_listings(cfg)
-            jobs.run_snapshot(cfg)
+        if manual.wait(max(sleep_s, 1)):
+            manual.run(scrape)
+        elif datetime.now(tz) >= nxt:
+            manual.run(scrape)
 
 
 def status(cfg):

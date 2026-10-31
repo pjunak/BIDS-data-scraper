@@ -47,6 +47,10 @@ tests/fixtures/      trimmed real portal responses
   nginx `auth_request` to `web/auth.py`. Login is password-only: each
   `BIDS_PASSWORD_HASH_<ROLE>` is one password and the password picks the role.
   `auth.py` uses the standard library only.
+- The dashboard's "Spustit sběr teď" posts to /api/run, served by the
+  collector daemon itself (`collector/trigger.py`, port 8082, stack-internal):
+  it only wakes the main loop, so manual and nightly scrapes never overlap,
+  with a cooldown between manual runs.
 - Datasette's `base_url` only prefixes its links; nginx strips `/db/` before
   proxying.
 - Every SQL in `web/index.html` and `datasette/metadata.yml` must run on the
