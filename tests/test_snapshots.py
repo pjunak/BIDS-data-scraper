@@ -27,6 +27,7 @@ class SnapshotTest(unittest.TestCase):
         raw = self.tmp / "restored.sqlite"
         raw.write_bytes(gzip.decompress(latest.read_bytes()))
         con = sqlite3.connect(raw)
+        self.addCleanup(con.close)
         self.assertEqual(con.execute("SELECT COUNT(*) FROM listing_snapshot").fetchone()[0], 5)
         self.assertEqual(con.execute("PRAGMA journal_mode").fetchone()[0], "delete")
         self.assertEqual([p.name for p in Path(self.cfg["exports_dir"]).iterdir() if p.name.startswith(".")], [],

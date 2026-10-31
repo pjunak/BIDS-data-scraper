@@ -1,6 +1,12 @@
+"""SQLite database: schema, views and the small write helpers the jobs use.
+
+Every scrape is a row in `run`; listings get one `listing_snapshot` row per run, so prices and
+listing duration are a time series. Raw portal JSON is kept in `listing_payload` / `listing_detail`.
+"""
 import hashlib
 import json
 import sqlite3
+from contextlib import closing
 from datetime import datetime, timezone
 
 SCHEMA = """
@@ -110,56 +116,71 @@ WHERE source = 'bezrealitky'
 
 
 def now() -> str:
+    """Current UTC time as stored in the database, e.g. 2026-11-01T02:15:00+00:00."""
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 def connect(path: str) -> sqlite3.Connection:
+    """Open the database, creating or updating the schema."""
     con = sqlite3.connect(path, timeout=60)
     con.row_factory = sqlite3.Row
     con.executescript(SCHEMA)
     return con
 
 
-def start_run(con, job: str) -> int:
-    cur = con.execute("INSERT INTO run(job, started_at, status) VALUES (?,?, 'running')", (job, now()))
+def open_db(path: str) -> "closing[sqlite3.Connection]":
+    """`with open_db(path) as con:` – a connection that is closed even when a job fails."""
+    return closing(connect(path))
+
+
+def start_run(con: sqlite3.Connection, job: str) -> int:
+    cur = con.execute("INSERT INTO run(job, started_at, status) VALUES (?, ?, 'running')", (job, now()))
     con.commit()
     return cur.lastrowid
 
 
-def finish_run(con, run_id: int, status: str, items: int = 0, message: str | None = None):
-    con.execute("UPDATE run SET finished_at=?, status=?, items=?, message=? WHERE id=?",
+def finish_run(con: sqlite3.Connection, run_id: int, status: str, items: int = 0, message: str | None = None):
+    con.execute("UPDATE run SET finished_at = ?, status = ?, items = ?, message = ? WHERE id = ?",
                 (now(), status, items, (message or "")[:2000], run_id))
     con.commit()
+
+
+def fail_interrupted_runs(con: sqlite3.Connection) -> int:
+    """Mark runs left 'running' by a restart (e.g. a deploy during a scrape) as failed."""
+    cur = con.execute("UPDATE run SET finished_at = ?, status = 'failed', message = 'interrupted by a restart' "
+                      "WHERE status = 'running'", (now(),))
+    con.commit()
+    return cur.rowcount
 
 
 def payload_hash(payload) -> str:
     return hashlib.sha1(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
 
 
-def save_listing(con, run_id: int, rec: dict, payload) -> bool:
-    """Store one snapshot. Returns True if this listing was never seen before."""
+def save_listing(con: sqlite3.Connection, run_id: int, rec: dict, payload) -> bool:
+    """Store one listing snapshot; the raw payload only when it changed. True if the listing is new."""
     ts = now()
-    h = payload_hash(payload)
-    new = con.execute("SELECT 1 FROM listing_snapshot WHERE source=? AND listing_id=? LIMIT 1",
-                      (rec["source"], rec["listing_id"])).fetchone() is None
-    con.execute("INSERT OR IGNORE INTO listing_payload VALUES (?,?,?,?,?)",
-                (rec["source"], rec["listing_id"], h, ts, json.dumps(payload, ensure_ascii=False)))
+    digest = payload_hash(payload)
+    is_new = con.execute("SELECT 1 FROM listing_snapshot WHERE source = ? AND listing_id = ? LIMIT 1",
+                         (rec["source"], rec["listing_id"])).fetchone() is None
+    con.execute("INSERT OR IGNORE INTO listing_payload VALUES (?, ?, ?, ?, ?)",
+                (rec["source"], rec["listing_id"], digest, ts, json.dumps(payload, ensure_ascii=False)))
     con.execute(
         """INSERT OR REPLACE INTO listing_snapshot
            (run_id, source, listing_id, scraped_at, offer_type, estate_type, title, price, area_m2,
             disposition, locality, lat, lon, url, payload_hash)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (run_id, rec["source"], rec["listing_id"], ts, rec.get("offer_type"), rec.get("estate_type"),
          rec.get("title"), rec.get("price"), rec.get("area_m2"), rec.get("disposition"),
-         rec.get("locality"), rec.get("lat"), rec.get("lon"), rec.get("url"), h))
-    return new
+         rec.get("locality"), rec.get("lat"), rec.get("lon"), rec.get("url"), digest))
+    return is_new
 
 
-def has_detail(con, source: str, listing_id: str) -> bool:
-    return con.execute("SELECT 1 FROM listing_detail WHERE source=? AND listing_id=? LIMIT 1",
+def has_detail(con: sqlite3.Connection, source: str, listing_id: str) -> bool:
+    return con.execute("SELECT 1 FROM listing_detail WHERE source = ? AND listing_id = ? LIMIT 1",
                        (source, listing_id)).fetchone() is not None
 
 
-def save_detail(con, source: str, listing_id: str, payload):
-    con.execute("INSERT OR IGNORE INTO listing_detail VALUES (?,?,?,?)",
+def save_detail(con: sqlite3.Connection, source: str, listing_id: str, payload):
+    con.execute("INSERT OR IGNORE INTO listing_detail VALUES (?, ?, ?, ?)",
                 (source, listing_id, now(), json.dumps(payload, ensure_ascii=False)))

@@ -1,34 +1,27 @@
-"""Small best-effort parsers. Raw payloads are always stored too, so mistakes here can be fixed later in ETL."""
+"""Best-effort parsing of free text (titles, prices). Raw payloads are stored too, so mistakes can be fixed in ETL."""
 import re
 
-_AREA = re.compile(r"(?<![\d+])(\d{1,3}(?:[\s\u00a0]\d{3})+|\d+)((?:[.,]\d+)?)\s*m(?:²|2)\b", re.I)
-_DISP = re.compile(r"\b(\d\s*\+\s*(?:kk|\d)|garsoni[eé]ra|atypick[ýy])\b", re.I)
+_AREA = re.compile(r"(?<![\d+])(\d{1,3}(?:[\s ]\d{3})+|\d+)((?:[.,]\d+)?)\s*m(?:²|2)\b", re.I)
+_DISPOSITION = re.compile(r"\b(\d\s*\+\s*(?:kk|\d)|garsoni[eé]ra|atypick[ýy])\b", re.I)
 _DIGITS = re.compile(r"\d+")
 
 
 def area_from_text(text: str | None) -> float | None:
-    if not text:
+    """First area in the text: 'Prodej bytu 3+1 80 m²' -> 80.0, 'pozemek 1 200 m²' -> 1200.0."""
+    match = _AREA.search(text or "")
+    if not match:
         return None
-    m = _AREA.search(text)
-    if not m:
-        return None
-    raw = re.sub(r"[\s\u00a0]", "", m.group(1)) + m.group(2).replace(",", ".")
-    try:
-        return float(raw)
-    except ValueError:
-        return None
+    whole = re.sub(r"[\s ]", "", match.group(1))
+    return float(whole + match.group(2).replace(",", "."))
 
 
 def disposition_from_text(text: str | None) -> str | None:
-    if not text:
-        return None
-    m = _DISP.search(text)
-    return re.sub(r"\s", "", m.group(1)).lower() if m else None
+    """'Prodej bytu 4 + 1' -> '4+1', 'Garsoniéra' -> 'garsoniéra'; None when the text has none."""
+    match = _DISPOSITION.search(text or "")
+    return re.sub(r"\s", "", match.group(1)).lower() if match else None
 
 
 def price_from_text(text: str | None) -> int | None:
-    """'5 490 000 Kč' -> 5490000; 'Cena na vyžádání' -> None."""
-    if not text:
-        return None
-    digits = "".join(_DIGITS.findall(text.split("Kč")[0]))
+    """'5 490 000 Kč' -> 5490000, '16 500 Kč/měsíc' -> 16500, 'Cena na vyžádání' -> None."""
+    digits = "".join(_DIGITS.findall((text or "").split("Kč")[0]))
     return int(digits) if digits else None

@@ -82,7 +82,7 @@ jobs:
           docker compose up -d --no-build --no-deps auth datasette web
           trap 'docker compose logs; docker compose down' EXIT
           base=http://127.0.0.1:8080
-          # Raw Location header: behind Caddy a redirect must not carry nginx's internal scheme or port.
+          # Raw Location header: behind the HTTPS proxy a redirect must not carry nginx's internal scheme or port.
           status() { curl --silent --output /dev/null --max-time 5 --write-out '%{http_code} %header{location}' "$@" || true; }
           for attempt in {1..30}; do  # nginx and the auth service are both up once / redirects to the login
             if [[ "$(status "$base/")" == "303 "* ]]; then break; fi

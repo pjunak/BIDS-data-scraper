@@ -405,7 +405,7 @@ async function load() {
     renderRuns(runs);
   } catch (e) {
     $("problem").hidden = false;
-    $("problem").innerHTML = `Databázi se nepodařilo načíst (${esc(e.message)}). Pokud sběrač ještě neproběhl, databáze neexistuje. Na serveru v <code>/opt/stacks/bids</code> zkontrolujte <code>docker compose ps</code> a <code>docker compose logs datasette</code>.`;
+    $("problem").innerHTML = `Databázi se nepodařilo načíst (${esc(e.message)}). Pokud sběrač ještě neproběhl, databáze neexistuje. Zkontrolujte <code>docker compose ps</code> a <code>docker compose logs datasette</code>.`;
     $("sources").innerHTML = "";
   }
   await Promise.all([loadLog(), loadSnapshot(), loadRun()]);

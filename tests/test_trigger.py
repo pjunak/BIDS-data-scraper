@@ -70,6 +70,7 @@ class TriggerHttpTest(unittest.TestCase):
 
     def tearDown(self):
         self.server.shutdown()
+        self.server.server_close()
 
     def call(self, method, path="/api/run"):
         con = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=10)

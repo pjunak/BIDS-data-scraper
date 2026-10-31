@@ -3,7 +3,6 @@
 Catches the classic mistake of renaming a column in db.py and silently breaking the website.
 """
 import re
-import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
@@ -18,6 +17,10 @@ class QueriesTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.con = db.connect(str(Path(tempfile.mkdtemp()) / "q.sqlite"))
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.con.close()
 
     def test_dashboard_queries(self):
         html = (Path(ROOT) / "web" / "index.html").read_text(encoding="utf-8")

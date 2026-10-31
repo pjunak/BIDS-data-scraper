@@ -75,6 +75,7 @@ class ServiceTest(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.server.shutdown()
+        cls.server.server_close()
 
     def request(self, method, path, body=None, cookie=None):
         con = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=10)

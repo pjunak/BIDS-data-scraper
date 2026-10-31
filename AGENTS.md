@@ -24,19 +24,21 @@ they run in Linux CI.
 ```text
 collector/sources/   one module per portal: iter_listings() -> (record, raw payload)
 collector/db.py      SQLite schema and views (views are recreated on every connect)
+collector/trigger.py manual runs requested from the dashboard
 config.yaml          sources, schedule, downloads; baked into the image
 datasette/           table descriptions and canned queries for /db/
 web/                 dashboard, login page + auth.py (password check), nginx.conf (non-root, :8080)
-tests/fixtures/      trimmed real portal responses
+tests/fixtures/      trimmed portal responses, personal data replaced
 ```
 
 ## Invariants
 
-- One image runs all four services (collector, Datasette, auth, nginx): infra's
-  digest deploy pins every service of a stack to one image. Production Compose,
-  the Caddy route and the server's password `.env` belong to `pjunak/infra`
-  (`stacks/bids`, `stacks/caddy`);
-  keep `docker-compose.yml` here in step with `stacks/bids`.
+- One image runs all four services (collector, Datasette, auth, nginx), because
+  the server's deploy pins every service of the stack to one image digest. The
+  server's Compose file, proxy and password `.env` live outside this public
+  repository; keep `docker-compose.yml` here in step with them.
+- The repository is shared with classmates and the teacher: no server paths,
+  credentials or personal data, and test fixtures stay anonymised.
 - Main CI tests, builds, smoke-tests and dispatches infra's Deploy with
   `service=bids` and the image digest. Pushing `main` deploys.
 - Raw payloads are always stored so parsers can be fixed in ETL. Never store

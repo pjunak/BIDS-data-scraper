@@ -39,6 +39,7 @@ class DownloadsTest(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.server.shutdown()
+        cls.server.server_close()
 
     def setUp(self):
         tmp = tempfile.mkdtemp()
@@ -51,6 +52,11 @@ class DownloadsTest(unittest.TestCase):
                         {"name": "todo", "enabled": False, "type": "direct", "url": "DOPLNIT"},
                     ]}
 
+    def db(self):
+        con = sqlite3.connect(self.cfg["db_path"])
+        self.addCleanup(con.close)
+        return con
+
     def files(self):
         return sorted(p.name for p in Path(self.cfg["files_dir"]).rglob("*") if p.is_file())
 
@@ -60,7 +66,7 @@ class DownloadsTest(unittest.TestCase):
         jobs.run_downloads(self.cfg)               # not due yet
         jobs.run_downloads(self.cfg, force=True)   # due, but nothing changed
         self.assertEqual(len(self.files()), 3)
-        con = sqlite3.connect(self.cfg["db_path"])
+        con = self.db()
         jobs_run = [r[0] for r in con.execute("SELECT job FROM run")]
         self.assertNotIn("download:todo", jobs_run, "disabled items never run")
         self.assertEqual(jobs_run.count("download:gtfs"), 2)
@@ -70,7 +76,7 @@ class DownloadsTest(unittest.TestCase):
         (self.www / "gtfs.zip").write_bytes(b"zip-v2")
         try:
             jobs.run_downloads(self.cfg, force=True, only="gtfs")
-            con = sqlite3.connect(self.cfg["db_path"])
+            con = self.db()
             self.assertEqual(con.execute("SELECT COUNT(*) FROM download WHERE name='gtfs'").fetchone()[0], 2)
             stored = sorted(Path(r[0]).read_bytes() for r in con.execute("SELECT path FROM download WHERE name='gtfs'"))
             self.assertEqual(stored, [b"zip-v1", b"zip-v2"], "a same-day version must not overwrite the first")
@@ -87,7 +93,7 @@ class DownloadsTest(unittest.TestCase):
         (self.www / "api" / "202601.zip").write_bytes(b"jan-updated")
         try:
             jobs.run_downloads(self.cfg, force=True)
-            con = sqlite3.connect(self.cfg["db_path"])
+            con = self.db()
             urls = [r[0].rsplit("/", 1)[1] for r in con.execute("SELECT url FROM download ORDER BY id")]
             self.assertEqual(urls, ["202601.zip", "202602.zip", "202602.zip"], "only the newest link is re-checked")
         finally:
@@ -97,7 +103,7 @@ class DownloadsTest(unittest.TestCase):
     def test_missing_links_mark_run_failed(self):
         self.cfg["downloads"][0]["link_regex"] = r"nothing-matches"
         jobs.run_downloads(self.cfg, only="mf")
-        con = sqlite3.connect(self.cfg["db_path"])
+        con = self.db()
         self.assertEqual(con.execute("SELECT status FROM run").fetchone()[0], "failed")
 
 

@@ -1,7 +1,8 @@
-# One image for the whole project; the infra stack runs it as three services:
+# One image for the whole project, run as four services:
 #   collector  python -m collector daemon      (scheduler, writes /data)
 #   datasette  datasette serve ...             (read-only SQL browser under /db/)
-#   web        nginx -c /app/web/nginx.conf    (dashboard, files, logs; the only service behind Caddy)
+#   auth       python /app/web/auth.py serve   (password login for nginx)
+#   web        nginx -c /app/web/nginx.conf    (dashboard, files, logs; the only public service)
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 TZ=Europe/Prague

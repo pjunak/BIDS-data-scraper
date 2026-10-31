@@ -1,4 +1,6 @@
+"""Loads config.yaml: sources, schedule and downloads (see the comments in that file)."""
 import os
+
 import yaml
 
 DEFAULT_PATH = os.environ.get("COLLECTOR_CONFIG", "/app/config.yaml")

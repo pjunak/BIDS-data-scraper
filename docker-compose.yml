@@ -1,6 +1,6 @@
 # Local run of the whole project (dashboard at http://127.0.0.1:8080, data in ./data,
 # password hash in .env).
-# Production runs the published image from pjunak/infra (stacks/bids), which mirrors this file.
+# The server runs the same four services from the published image.
 name: bids-local
 
 services:
