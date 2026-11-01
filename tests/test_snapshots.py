@@ -3,6 +3,7 @@ import os
 import sqlite3
 import tempfile
 import unittest
+from datetime import datetime
 from pathlib import Path
 from unittest import mock
 
@@ -39,7 +40,7 @@ class SnapshotTest(unittest.TestCase):
         for d in ["2026-01-01", "2026-01-02", "2026-01-03"]:
             (out / f"collector-{d}.sqlite.gz").write_bytes(b"old")
         with mock.patch.object(snapshots, "datetime") as dt:
-            dt.now.return_value.strftime.return_value = "2026-01-04"
+            dt.now.return_value = datetime(2026, 1, 4)
             snapshots.make_snapshot(self.cfg["db_path"], str(out), keep=2)
         dated = sorted(p.name for p in out.glob("collector-????-??-??.sqlite.gz"))
         self.assertEqual(dated, ["collector-2026-01-03.sqlite.gz", "collector-2026-01-04.sqlite.gz"])
