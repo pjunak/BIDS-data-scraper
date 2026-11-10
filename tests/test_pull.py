@@ -142,9 +142,9 @@ class PullTest(unittest.TestCase):
         con = sqlite3.connect(self.local / "collector.sqlite")
         self.addCleanup(con.close)
         self.assertEqual(con.execute("SELECT COUNT(*) FROM download").fetchone()[0], 4)
-        self.assertEqual(self.local_files(), ["csu/2026-11-01_x.csv", "policie/2026-11-01_202601.zip",
-                                              "policie/2026-11-01_202602.zip"], "newest version of every URL")
-        self.assertEqual((self.local / "files/csu/2026-11-01_x.csv").read_bytes(), b"version 2")
+        self.assertEqual(self.local_files(), ["csu/x.csv", "policie/202601.zip", "policie/202602.zip"],
+                         "newest version of every URL, under its original name")
+        self.assertEqual((self.local / "files/csu/x.csv").read_bytes(), b"version 2")
         if os.name == "posix":
             self.assertEqual((self.local / ".pull-session").stat().st_mode & 0o777, 0o600)
 
@@ -163,17 +163,42 @@ class PullTest(unittest.TestCase):
         self.assertEqual(self.pull(), [])
         self.assertEqual(sorted(h for h in self.site.hits if h != "/api/exports/"),
                          ["/exports/collector-2026-12-02.sqlite.gz", "/files/csu/2026-12-01_x.csv"])
-        self.assertEqual(self.local_files(), ["csu/2026-12-01_x.csv", "csu/moje_poznamky.txt",
-                                              "policie/2026-11-01_202601.zip", "policie/2026-11-01_202602.zip"])
+        self.assertEqual(self.local_files(), ["csu/moje_poznamky.txt", "csu/x.csv",
+                                              "policie/202601.zip", "policie/202602.zip"], "same paths as before")
+        self.assertEqual((self.local / "files/csu/x.csv").read_bytes(), b"version 3", "replaced in place")
 
     def test_only_and_all_versions(self):
         self.standard_server()
         self.pull(only=["csu"], all_versions=True)
-        self.assertEqual(self.local_files(), ["csu/2026-10-01_x.csv", "csu/2026-11-01_x.csv"])
+        self.assertEqual(self.local_files(), ["csu/2026-10-01_x.csv", "csu/x.csv"],
+                         "older versions keep the server's dated name, the newest has the plain one")
+        self.assertEqual((self.local / "files/csu/2026-10-01_x.csv").read_bytes(), b"version 1")
         self.pull()
         self.assertIn("csu/2026-10-01_x.csv", self.local_files(), "explicitly fetched versions stay")
         with self.assertRaisesRegex(pull.PullError, "unknown file name.*available: csu, policie"):
             self.pull(only=["nonsense"])
+
+    def test_a_copy_under_another_name_is_moved_not_downloaded(self):
+        """E.g. files from the first version of pull, which kept the server's dated names."""
+        self.standard_server()
+        self.pull()
+        state_path = self.local / ".pull.json"
+        state = json.loads(state_path.read_text())
+        for plain, dated in [("csu/x.csv", "csu/2026-11-01_x.csv"), ("policie/202601.zip", "policie/2026-11-01_202601.zip")]:
+            os.replace(self.local / "files" / plain, self.local / "files" / dated)
+            state["files"][dated] = state["files"].pop(plain)
+        state_path.write_text(json.dumps(state))
+        self.site.hits.clear()
+        self.assertEqual(self.pull(), [])
+        self.assertEqual(self.site.hits, ["/api/exports/"], "nothing downloaded")
+        self.assertEqual(self.local_files(), ["csu/x.csv", "policie/202601.zip", "policie/202602.zip"])
+
+    def test_same_file_name_from_two_urls_keeps_the_server_names(self):
+        self.add_file("dup", "https://a/data.csv", "2026-11-01_data.csv", b"from a")
+        self.add_file("dup", "https://b/data.csv", "2026-11-01-2_data.csv", b"from b")
+        self.snapshot("2026-11-02")
+        self.assertEqual(self.pull(), [])
+        self.assertEqual(self.local_files(), ["dup/2026-11-01-2_data.csv", "dup/2026-11-01_data.csv"])
 
     def test_database_only(self):
         self.standard_server()
@@ -198,8 +223,8 @@ class PullTest(unittest.TestCase):
     def test_a_damaged_file_is_reported_and_not_kept(self):
         self.standard_server()
         (self.server_dir / "files/policie/2026-11-01_202601.zip").write_bytes(b"JAN")  # same size, other content
-        self.assertEqual(self.pull(), ["policie/2026-11-01_202601.zip"])
-        self.assertEqual(self.local_files(), ["csu/2026-11-01_x.csv", "policie/2026-11-01_202602.zip"])
+        self.assertEqual(self.pull(), ["policie/202601.zip"])
+        self.assertEqual(self.local_files(), ["csu/x.csv", "policie/202602.zip"])
 
     def test_a_truncated_snapshot_keeps_the_old_database(self):
         self.standard_server()
@@ -229,7 +254,7 @@ class PullTest(unittest.TestCase):
         first = subprocess.run(cmd, cwd=work, env=env, capture_output=True, text=True, timeout=60)
         self.assertEqual(first.returncode, 0, first.stderr)
         self.assertTrue((work / "bids-data" / "collector.sqlite").is_file(), "default folder ./bids-data")
-        self.assertTrue((work / "bids-data" / "files" / "policie" / "2026-11-01_202602.zip").is_file())
+        self.assertTrue((work / "bids-data" / "files" / "policie" / "202602.zip").is_file())
         again = subprocess.run(cmd, cwd=work, env=dict(env, BIDS_PASSWORD=""), capture_output=True, text=True,
                                timeout=60, stdin=subprocess.DEVNULL)
         self.assertEqual(again.returncode, 0, again.stderr)

@@ -58,12 +58,16 @@ Zeptá se na heslo (stejné jako na webu) a uloží data do složky `bids-data`.
 příkaz znovu ve stejné složce, stáhne jen to, co se od minula změnilo. Bez hesla je veřejný jen samotný skript
 `/pull.py` (stejný jako `collector/pull.py` tady na GitHubu), data ne.
 
-- `bids-data/collector.sqlite` je nejnovější noční snapshot databáze (vzniká po nočním sběru, takže je nejvýš
-  den starý). Každý nový snapshot ho přepíše, vlastní tabulky si proto ukládejte do jiného souboru. Otevřete ho
+- `bids-data/collector.sqlite` je vždy nejnovější noční snapshot databáze, pořád pod stejným názvem (vzniká
+  po nočním sběru, takže je nejvýš den starý). Každý nový snapshot ho přepíše, vlastní tabulky si proto ukládejte do jiného souboru. Otevřete ho
   v DB Browser for SQLite, pandas nebo SSIS.
-- `bids-data/files/<název>/` obsahuje sekundární soubory, od každého jen nejnovější verzi. Každý soubor se ověří
-  podle SHA-256 z tabulky `download`. Starší verze, které nahradila novější, se smažou; vlastní soubory ve
-  složce zůstanou.
+- `bids-data/files/<zdroj>/` obsahuje sekundární soubory pod původními názvy, např.
+  `csu_mzdy_kraje/csu_MZDR_mzdy_kraje.csv` nebo `policie_mapa_kriminality/202301.zip`. Názvy se nemění:
+  novější verze souboru přepíše starší pod stejným názvem, takže cesty v ETL můžou zůstat napevno. Zdroje
+  s jedním souborem za měsíc nebo čtvrtletí (Policie, historie MPSV, cenová mapa MF) jen přibývají o další
+  soubory, ty ETL projde smyčkou přes složku. Výjimka: ČSÚ má v názvu `csu_median_mezd_kraje` číslo vydání,
+  takže nové roční vydání přibude jako druhý soubor (novější poznáte podle `fetched_at` v tabulce
+  `download`). Každý soubor se ověří podle SHA-256; vlastní soubory ve složce zůstanou.
 - Přihlášení se uloží do `bids-data/.pull-session` a platí 30 dní, pak se příkaz zeptá znovu. S volbou
   `--password` se neptá vůbec, takže příkaz poběží i bez obsluhy (skript, vyučující).
 - Na macOSu s Pythonem z python.org nejdřív spusťte *Install Certificates.command* ze složky Pythonu, jinak
@@ -75,7 +79,7 @@ Volby se píšou za příkaz, například `python3 -c "import urllib.request as 
 |---|---|
 | `--no-files` | jen databáze |
 | `--only csu_mzdy_kraje` | jen vybrané soubory (lze opakovat) |
-| `--all-versions` | i starší verze souborů (další spuštění je nesmaže) |
+| `--all-versions` | i starší verze souborů, s datem stažení na začátku názvu (další spuštění je nesmaže) |
 | `--data D:/bids` | jiná složka než `./bids-data` |
 | `--password HESLO` | heslo rovnou v příkazu, nic se neptá (jinak proměnná `BIDS_PASSWORD`, jinak dotaz) |
 

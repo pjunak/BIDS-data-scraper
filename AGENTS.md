@@ -61,7 +61,10 @@ tests/fixtures/      trimmed portal responses, personal data replaced
   the package. It depends on the login form and cookie (`web/auth.py`), the JSON listing
   `/api/exports/`, snapshot names `collector-YYYY-MM-DD.sqlite.gz` and files served as
   `/files/<name>/<file>` with their SHA-256 in `download`; `tests/test_pull.py` and the CI
-  smoke test (which runs the one-liner) cover that contract.
+  smoke test (which runs the one-liner) cover that contract. Locally it saves the newest
+  version of each URL under its original name (the `<date>[-n]_` prefix of
+  `collector/downloads.py` dropped, see `STAMP_RE`), so teammates' ETL paths never change;
+  keep the two in step.
 - Datasette's `base_url` only prefixes its links; nginx strips `/db/` before
   proxying.
 - Every SQL in `web/index.html` and `datasette/metadata.yml` must run on the

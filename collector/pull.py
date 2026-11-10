@@ -9,7 +9,8 @@ It logs in with the team password (the same one as on the website) and downloads
   * the newest nightly database snapshot (/exports/collector-YYYY-MM-DD.sqlite.gz)
     into <data>/collector.sqlite,
   * the secondary files listed in that snapshot's `download` table into <data>/files/<name>/,
-    each checked against its SHA-256. By default only the newest version of every file.
+    each checked against its SHA-256. By default only the newest version of every file, under
+    its original name (without the server's download date), so local paths never change.
 Only what changed since the last pull is downloaded. The password is asked when the site wants a
 login, or given up front with --password (or $BIDS_PASSWORD) so the command runs unattended. The
 session cookie is kept in <data>/.pull-session, so it is needed again only after 30 days.
@@ -41,6 +42,7 @@ log = logging.getLogger("collector.pull")
 DEFAULT_URL = "https://bids.junak.eu"
 COOKIE = "bids_session"  # web/auth.py
 SNAPSHOT_RE = re.compile(r"^collector-\d{4}-\d{2}-\d{2}\.sqlite\.gz$")
+STAMP_RE = re.compile(r"^\d{4}-\d{2}-\d{2}(?:-\d+)?_(.+)$")  # collector/downloads.py: <date>[-n]_<original name>
 DB_NAME = "collector.sqlite"
 STATE_NAME = ".pull.json"
 SESSION_NAME = ".pull-session"
@@ -214,10 +216,18 @@ def _safe_part(text: str) -> bool:
     return bool(text) and not text.startswith(".") and "/" not in text and "\\" not in text
 
 
-def wanted_files(db_path: Path, only: list[str] | None, all_versions: bool) -> list[dict]:
-    """Files to have locally, from the `download` table: {'name', 'rel', 'sha256', 'bytes'}.
+def _original_name(server_name: str) -> str:
+    match = STAMP_RE.match(server_name)
+    return match.group(1) if match else server_name
 
-    The newest version of every downloaded URL; with all_versions every stored version."""
+
+def wanted_files(db_path: Path, only: list[str] | None, all_versions: bool) -> list[dict]:
+    """Files to have locally, from the `download` table: {'name', 'server', 'rel', 'sha256', 'bytes'}.
+
+    `server` is the path under /files/, `rel` the local path under <data>/files/. The newest
+    version of every downloaded URL is saved under its original name, so a newer version replaces
+    it in place and ETL paths stay fixed. With all_versions the older versions are kept too, under
+    the server's dated names."""
     con = sqlite3.connect(db_path)
     try:
         rows = con.execute("SELECT id, name, url, path, sha256, bytes FROM download ORDER BY id").fetchall()
@@ -230,15 +240,25 @@ def wanted_files(db_path: Path, only: list[str] | None, all_versions: bool) -> l
     newest: dict[tuple, tuple] = {}
     for row in rows:
         newest[(row[1], row[2])] = row  # rows are ordered by id, so the last one wins
+    newest_ids = {row[0] for row in newest.values()}
     chosen = rows if all_versions else sorted(newest.values())
     files = []
-    for _, name, _, path, sha, size in chosen:
+    for row_id, name, _, path, sha, size in chosen:
         if only and name not in only:
             continue
-        filename = path.replace("\\", "/").rsplit("/", 1)[-1]  # stored as the server's path
-        if not (_safe_part(name) and _safe_part(filename)):
-            raise PullError(f"unexpected file path in the database: {name}/{filename}")
-        files.append({"name": name, "rel": f"{name}/{filename}", "sha256": sha, "bytes": size})
+        server_name = path.replace("\\", "/").rsplit("/", 1)[-1]  # stored as the server's path
+        local_name = _original_name(server_name) if row_id in newest_ids else server_name
+        if not (_safe_part(name) and _safe_part(server_name) and _safe_part(local_name)):
+            raise PullError(f"unexpected file path in the database: {name}/{server_name}")
+        files.append({"name": name, "server": f"{name}/{server_name}", "rel": f"{name}/{local_name}",
+                      "sha256": sha, "bytes": size})
+    # Two URLs of one item with the same file name: keep the server's (unique) names for those.
+    taken: dict[str, int] = {}
+    for f in files:
+        taken[f["rel"]] = taken.get(f["rel"], 0) + 1
+    for f in files:
+        if taken[f["rel"]] > 1:
+            f["rel"] = f["server"]
     return files
 
 
@@ -257,7 +277,7 @@ def _download_file(site: Site, want: dict, dest: Path):
     part = dest.with_name(f".{dest.name}.part")
     digest, size = hashlib.sha256(), 0
     try:
-        r = site.get("/files/" + "/".join(urllib.parse.quote(p) for p in want["rel"].split("/")))
+        r = site.get("/files/" + "/".join(urllib.parse.quote(p) for p in want["server"].split("/")))
         try:
             with open(part, "wb") as f:
                 for chunk in _chunks(r):
@@ -294,6 +314,25 @@ def pull_files(site: Site, data: Path, files: list[dict], state: dict, save, kee
             remember(w, path)
         else:
             todo.append(w)
+
+    # A file that is already here under another name (an earlier layout, or a renamed version)
+    # is moved instead of downloaded again. Only files pull itself saved and nobody changed.
+    wanted = {w["rel"] for w in files}
+    here: dict[str, str] = {}
+    for rel, entry in known.items():
+        path = data / "files" / rel
+        if rel not in wanted and not entry.get("keep") and path.is_file() \
+                and path.stat().st_mtime_ns == entry.get("mtime_ns"):
+            here.setdefault(entry["sha256"], rel)
+    for w in list(todo):
+        old = here.pop(w["sha256"], None)
+        if old:
+            dest = data / "files" / w["rel"]
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            _replace(data / "files" / old, dest)
+            log.info("renamed files/%s -> files/%s", old, w["rel"])
+            remember(w, dest)
+            todo.remove(w)
     if todo:
         log.info("%d files to download (%.0f MB)", len(todo), sum(w["bytes"] for w in todo) / 1e6)
     failed = []
@@ -314,7 +353,6 @@ def pull_files(site: Site, data: Path, files: list[dict], state: dict, save, kee
 
     # Older versions that an earlier pull fetched and a newer one has replaced. Files changed
     # locally are kept, and so is everything pull did not download itself.
-    wanted = {w["rel"] for w in files}
     pulled_names = {w["name"] for w in files}
     for rel in sorted(set(known) - wanted):
         path = data / "files" / rel
