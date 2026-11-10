@@ -41,7 +41,49 @@ Surová data se ukládají vždy, takže chybu parseru jde opravit později v ET
 U pronájmu je `price` měsíční nájem. Kontakty na prodávající a makléře se neukládají.
 
 **Stažení dat** na webu: celá databáze `/exports/collector-latest.sqlite.gz` (posledních 7 nocí v `/exports/`),
-CSV libovolné tabulky nebo SQL dotazu přes `/db/`, sekundární soubory v `/files/`.
+CSV libovolné tabulky nebo SQL dotazu přes `/db/`, sekundární soubory v `/files/`. Automaticky do počítače
+viz [Lokální kopie dat](#lokální-kopie-dat).
+
+## Lokální kopie dat
+
+Pro ETL a analýzu si data stáhněte k sobě jedním příkazem. Stačí Python 3.8 nebo novější, nic dalšího se
+neinstaluje a repozitář není potřeba klonovat. Spusťte ho v terminálu ve složce, kam chcete data uložit
+(na Windows v PowerShellu a místo `python3` napište `python`):
+
+```bash
+python3 -c "import urllib.request as u; exec(u.urlopen('https://bids.junak.eu/pull.py').read())"
+```
+
+Zeptá se na heslo (stejné jako na webu) a uloží data do složky `bids-data`. Pro aktualizaci spusťte stejný
+příkaz znovu ve stejné složce, stáhne jen to, co se od minula změnilo. Bez hesla je veřejný jen samotný skript
+`/pull.py` (stejný jako `collector/pull.py` tady na GitHubu), data ne.
+
+- `bids-data/collector.sqlite` je nejnovější noční snapshot databáze (vzniká po nočním sběru, takže je nejvýš
+  den starý). Každý nový snapshot ho přepíše, vlastní tabulky si proto ukládejte do jiného souboru. Otevřete ho
+  v DB Browser for SQLite, pandas nebo SSIS.
+- `bids-data/files/<název>/` obsahuje sekundární soubory, od každého jen nejnovější verzi. Každý soubor se ověří
+  podle SHA-256 z tabulky `download`. Starší verze, které nahradila novější, se smažou; vlastní soubory ve
+  složce zůstanou.
+- Přihlášení se uloží do `bids-data/.pull-session` a platí 30 dní, pak se příkaz zeptá znovu. S volbou
+  `--password` se neptá vůbec, takže příkaz poběží i bez obsluhy (skript, vyučující).
+- Na macOSu s Pythonem z python.org nejdřív spusťte *Install Certificates.command* ze složky Pythonu, jinak
+  skončí chybou `CERTIFICATE_VERIFY_FAILED`.
+
+Volby se píšou za příkaz, například `python3 -c "import urllib.request as u; exec(u.urlopen('https://bids.junak.eu/pull.py').read())" --no-files`:
+
+| Volba | Co dělá |
+|---|---|
+| `--no-files` | jen databáze |
+| `--only csu_mzdy_kraje` | jen vybrané soubory (lze opakovat) |
+| `--all-versions` | i starší verze souborů (další spuštění je nesmaže) |
+| `--data D:/bids` | jiná složka než `./bids-data` |
+| `--password HESLO` | heslo rovnou v příkazu, nic se neptá (jinak proměnná `BIDS_PASSWORD`, jinak dotaz) |
+
+Celý příkaz i s heslem patří do dokumentace pro vyučujícího, ne sem: repozitář je veřejný a heslo má držet
+stranou roboty, kteří hledají databáze na internetu.
+
+V klonu repozitáře dělá totéž `python -m collector pull`, jen ukládá do `./data` (tam, kde data čte i lokální
+`docker compose`).
 
 ## Struktura repozitáře
 
@@ -54,6 +96,7 @@ collector/            sběrač (Python 3.12)
   db.py               schéma databáze a pohledy
   snapshots.py        noční .sqlite.gz ke stažení
   trigger.py          ruční spuštění sběru z webu
+  pull.py             lokální kopie dat z webu; web ho sám nabízí na /pull.py (jen standardní knihovna)
 config.yaml           co a kdy se stahuje (zdroje, URL, plán)
 datasette/            popis tabulek a připravené dotazy pro /db/
 web/                  přehled (index.html), přihlášení (login.html, auth.py), nginx.conf

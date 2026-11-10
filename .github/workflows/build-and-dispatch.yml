@@ -79,6 +79,7 @@ jobs:
           printf 'BIDS_PASSWORD_HASH_USER=%s\n' "$(echo ci-password | docker run -i --rm "$img" python /app/web/auth.py hash)" > .env
           mkdir -m 777 data
           docker compose run --rm --no-deps collector python -m collector status
+          docker compose run --rm --no-deps collector python -m collector snapshot
           docker compose up -d --no-build --no-deps auth datasette web
           trap 'docker compose logs; docker compose down' EXIT
           base=http://127.0.0.1:8080
@@ -107,6 +108,12 @@ jobs:
           done
           [[ "$(status --cookie "$cookie" "$base/nginx.conf")" == "404 " ]]
           [[ "$(status --cookie "$cookie" "$base/auth.py")" == "404 " ]]
+          # The one-command local copy exactly as teammates run it: the script from the site, standard library only.
+          [[ "$(status "$base/pull.py")" == "200 " ]]
+          [[ "$(status "$base/files/")" == "303 /login?next=/files/" ]]
+          python3 -I -c "import urllib.request as u; exec(u.urlopen('$base/pull.py').read())" \
+            --url "$base" --data "$RUNNER_TEMP/pulled" --password ci-password </dev/null
+          test -s "$RUNNER_TEMP/pulled/collector.sqlite"
 
       - name: Skip superseded main revisions
         id: current

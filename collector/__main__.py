@@ -9,7 +9,7 @@ import os
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from . import config, db, export, jobs, trigger
+from . import config, db, export, jobs, pull, trigger
 from .sources import SOURCES
 
 log = logging.getLogger("collector")
@@ -104,12 +104,19 @@ def build_parser() -> argparse.ArgumentParser:
 
     commands.add_parser("snapshot", help="create the downloadable gzip snapshot of the database")
     commands.add_parser("status", help="show the last runs and counts")
+
+    local = commands.add_parser("pull", help="download a local copy of the data from the website "
+                                             "(database + files; only what changed)")
+    pull.add_arguments(local, "data")
     return parser
 
 
 def main():
-    setup_logging()
     args = build_parser().parse_args()
+    if args.command == "pull":  # runs on a teammate's computer: no config.yaml, no /data
+        logging.basicConfig(level=logging.INFO, format="%(message)s")
+        raise SystemExit(pull.run(args))
+    setup_logging()
     cfg = config.load(args.config)
     if args.command == "daemon":
         daemon(cfg)
