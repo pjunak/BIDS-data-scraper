@@ -14,7 +14,7 @@ from .sources import SOURCES
 
 log = logging.getLogger("collector")
 
-WAKE_UP_S = 3600  # the daemon checks due downloads at least this often
+WAKE_UP_S = 3600  # the daemon checks due downloads at least this often #
 
 
 def next_run_at(now: datetime, hour: int, minute: int) -> datetime:
