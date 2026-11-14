@@ -1,0 +1,109 @@
+erDiagram
+    DIM_DATUM {
+        int datum_key PK
+    }
+    DIM_LOKALITA {
+        int lokalita_key PK
+        int obec_kod "rollup"
+    }
+    DIM_OBEC {
+        int obec_key PK
+        int obec_kod "rollup"
+        varchar kraj_kod "rollup"
+    }
+    DIM_KRAJ {
+        int kraj_key PK
+        varchar kraj_kod "rollup"
+    }
+    DIM_NEMOVITOST {
+        int nemovitost_key PK
+    }
+    DIM_VELIKOST_BYTU {
+        tinyint velikost_bytu_key PK
+    }
+    DIM_NABIDKA {
+        tinyint nabidka_key PK
+    }
+    DIM_ZDROJ {
+        tinyint zdroj_key PK
+    }
+    DIM_DRUH_DELIKTU {
+        int druh_deliktu_key PK
+    }
+    DIM_STAV_DELIKTU {
+        tinyint stav_deliktu_key PK
+    }
+    FACT_INZERAT_SNAPSHOT {
+        int datum_key PK, FK
+        int lokalita_key FK
+        int nemovitost_key FK
+        tinyint velikost_bytu_key FK
+        tinyint nabidka_key FK
+        tinyint zdroj_key PK, FK
+        nvarchar inzerat_id PK "DD"
+        int skupina_duplicit_id "DD"
+    }
+    FACT_INZERAT_ZIVOTNI_CYKLUS {
+        int prvni_vyskyt_datum_key FK
+        int posledni_vyskyt_datum_key FK
+        int lokalita_key FK
+        int nemovitost_key FK
+        tinyint velikost_bytu_key FK
+        tinyint nabidka_key FK
+        tinyint zdroj_key PK, FK
+        nvarchar inzerat_id PK "DD"
+        int skupina_duplicit_id "DD"
+    }
+    FACT_NAJEMNE_MF {
+        int datum_key PK, FK
+        int uzemni_jednotka_kod PK "DD"
+        int lokalita_key FK
+        tinyint velikost_bytu_key PK, FK
+    }
+    FACT_OBYVATELSTVO {
+        int datum_key PK, FK
+        int obec_key PK, FK
+    }
+    FACT_NEZAMESTNANOST {
+        int datum_key PK, FK
+        int obec_key PK, FK
+    }
+    FACT_DELIKT {
+        bigint delikt_id PK "DD"
+        int druh_deliktu_key PK, FK
+        int datum_key FK
+        int obec_key FK
+        tinyint stav_deliktu_key FK
+    }
+    FACT_MZDY {
+        int datum_key PK, FK
+        int kraj_key PK, FK
+    }
+    DIM_DATUM ||--|{ FACT_INZERAT_SNAPSHOT : "datum"
+    DIM_LOKALITA ||--|{ FACT_INZERAT_SNAPSHOT : "lokalita"
+    DIM_NEMOVITOST ||--|{ FACT_INZERAT_SNAPSHOT : "nemovitost"
+    DIM_VELIKOST_BYTU ||--|{ FACT_INZERAT_SNAPSHOT : "velikost_bytu"
+    DIM_NABIDKA ||--|{ FACT_INZERAT_SNAPSHOT : "nabidka"
+    DIM_ZDROJ ||--|{ FACT_INZERAT_SNAPSHOT : "zdroj"
+    DIM_DATUM ||--|{ FACT_INZERAT_ZIVOTNI_CYKLUS : "prvni_vyskyt"
+    DIM_DATUM ||--|{ FACT_INZERAT_ZIVOTNI_CYKLUS : "posledni_vyskyt"
+    DIM_LOKALITA ||--|{ FACT_INZERAT_ZIVOTNI_CYKLUS : "lokalita"
+    DIM_NEMOVITOST ||--|{ FACT_INZERAT_ZIVOTNI_CYKLUS : "nemovitost"
+    DIM_VELIKOST_BYTU ||--|{ FACT_INZERAT_ZIVOTNI_CYKLUS : "velikost_bytu"
+    DIM_NABIDKA ||--|{ FACT_INZERAT_ZIVOTNI_CYKLUS : "nabidka"
+    DIM_ZDROJ ||--|{ FACT_INZERAT_ZIVOTNI_CYKLUS : "zdroj"
+    DIM_DATUM ||--|{ FACT_NAJEMNE_MF : "datum"
+    DIM_LOKALITA ||--|{ FACT_NAJEMNE_MF : "lokalita"
+    DIM_VELIKOST_BYTU ||--|{ FACT_NAJEMNE_MF : "velikost_bytu"
+    DIM_DATUM ||--|{ FACT_OBYVATELSTVO : "datum"
+    DIM_OBEC ||--|{ FACT_OBYVATELSTVO : "obec"
+    DIM_DATUM ||--|{ FACT_NEZAMESTNANOST : "datum"
+    DIM_OBEC ||--|{ FACT_NEZAMESTNANOST : "obec"
+    DIM_DRUH_DELIKTU ||--|{ FACT_DELIKT : "druh_deliktu"
+    DIM_DATUM ||--|{ FACT_DELIKT : "datum"
+    DIM_OBEC ||--|{ FACT_DELIKT : "obec"
+    DIM_STAV_DELIKTU ||--|{ FACT_DELIKT : "stav_deliktu"
+    DIM_DATUM ||--|{ FACT_MZDY : "datum"
+    DIM_KRAJ ||--|{ FACT_MZDY : "kraj"
+    DIM_OBEC ||..|{ DIM_LOKALITA : "obec_kod"
+    DIM_KRAJ ||..|{ DIM_OBEC : "kraj_kod"

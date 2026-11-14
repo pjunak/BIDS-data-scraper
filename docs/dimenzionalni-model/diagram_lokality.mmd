@@ -1,0 +1,87 @@
+erDiagram
+    DIM_OBEC {
+        int obec_key PK "NOT NULL"
+        int obec_kod "NOT NULL"
+        nvarchar obec_nazev "NOT NULL"
+        char okres_kod "NOT NULL"
+        nvarchar okres_nazev "NOT NULL"
+        varchar kraj_kod "NOT NULL"
+        nvarchar kraj_nazev "NOT NULL"
+        bit je_brno "NOT NULL"
+        decimal vzdalenost_od_brna_km "NOT NULL"
+        nvarchar pasmo_vzdalenosti "NOT NULL"
+        tinyint poradi_pasma "NOT NULL"
+    }
+    DIM_DATUM {
+        int datum_key PK "NOT NULL"
+        date datum "NOT NULL"
+        tinyint den "NOT NULL"
+        tinyint den_v_tydnu "NOT NULL"
+        nvarchar den_nazev "NOT NULL"
+        bit je_vikend "NOT NULL"
+        tinyint tyden_iso "NOT NULL"
+        tinyint mesic "NOT NULL"
+        nvarchar mesic_nazev "NOT NULL"
+        char rok_mesic "NOT NULL"
+        tinyint ctvrtleti "NOT NULL"
+        smallint rok "NOT NULL"
+    }
+    DIM_DRUH_DELIKTU {
+        int druh_deliktu_key PK "NOT NULL"
+        smallint kod "NOT NULL"
+        nvarchar nazev "NOT NULL"
+        nvarchar skupina "NOT NULL"
+        nvarchar kategorie "NOT NULL"
+    }
+    DIM_STAV_DELIKTU {
+        tinyint stav_deliktu_key PK "NOT NULL"
+        tinyint kod "NOT NULL"
+        nvarchar nazev "NOT NULL"
+        bit je_objasneno "NOT NULL"
+        bit je_zapocitany "NOT NULL"
+    }
+    DIM_KRAJ {
+        int kraj_key PK "NOT NULL"
+        varchar kraj_kod "NOT NULL"
+        nvarchar kraj_nazev "NOT NULL"
+        bit je_jmk "NOT NULL"
+    }
+    FACT_OBYVATELSTVO {
+        int datum_key PK, FK "NOT NULL"
+        int obec_key PK, FK "NOT NULL"
+        int pocet_obyvatel "NOT NULL"
+        int pocet_obyvatel_pred_5_lety "NULL"
+        decimal zmena_5_let_pct "NULL"
+    }
+    FACT_NEZAMESTNANOST {
+        int datum_key PK, FK "NOT NULL"
+        int obec_key PK, FK "NOT NULL"
+        int pocet_obyvatel_15_64 "NOT NULL"
+        int pocet_uchazecu "NOT NULL"
+        int pocet_dosazitelnych_uchazecu "NOT NULL"
+        decimal podil_nezamestnanych_pct "NOT NULL"
+    }
+    FACT_DELIKT {
+        bigint delikt_id PK "DD, NOT NULL"
+        int druh_deliktu_key PK, FK "NOT NULL"
+        int datum_key FK "NOT NULL"
+        int obec_key FK "NOT NULL"
+        tinyint stav_deliktu_key FK "NOT NULL"
+        tinyint pocet_deliktu "NOT NULL"
+    }
+    FACT_MZDY {
+        int datum_key PK, FK "NOT NULL"
+        int kraj_key PK, FK "NOT NULL"
+        decimal prumerna_mzda_kc "NOT NULL"
+        decimal medianova_mzda_kc "NULL"
+    }
+    DIM_DATUM ||--|{ FACT_OBYVATELSTVO : "datum"
+    DIM_OBEC ||--|{ FACT_OBYVATELSTVO : "obec"
+    DIM_DATUM ||--|{ FACT_NEZAMESTNANOST : "datum"
+    DIM_OBEC ||--|{ FACT_NEZAMESTNANOST : "obec"
+    DIM_DRUH_DELIKTU ||--|{ FACT_DELIKT : "druh_deliktu"
+    DIM_DATUM ||--|{ FACT_DELIKT : "datum"
+    DIM_OBEC ||--|{ FACT_DELIKT : "obec"
+    DIM_STAV_DELIKTU ||--|{ FACT_DELIKT : "stav_deliktu"
+    DIM_DATUM ||--|{ FACT_MZDY : "datum"
+    DIM_KRAJ ||--|{ FACT_MZDY : "kraj"
